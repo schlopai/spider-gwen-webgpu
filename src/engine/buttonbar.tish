@@ -17,8 +17,8 @@ export fn createButtonBar(gpu, host) {
 
   let W = 480
   let H = 128
-  let pad = 12
-  let hintH = 18
+  let pad = 14
+  let hintH = 22
   let rowH = 42
   let btnH = 36
   let wideStart = 80
@@ -99,13 +99,18 @@ export fn createButtonBar(gpu, host) {
   let self = { defs: defs }
   self.bake = (active) => {
     js_call(ctx, "clearRect", [0, 0, W, H])
-    js_set(ctx, "fillStyle", "rgba(10,12,24,0.6)")
+    js_set(ctx, "fillStyle", "rgba(8,10,22,0.55)")
     js_call(ctx, "fillRect", [0, 0, W, H])
+    js_set(ctx, "fillStyle", "rgba(120,90,200,0.9)")
+    js_call(ctx, "fillRect", [0, 0, W, 3])
+    js_set(ctx, "textBaseline", "alphabetic")
+    js_set(ctx, "textAlign", "left")
+    js_set(ctx, "font", "15px ui-monospace, monospace")
+    js_set(ctx, "fillStyle", "#8fe6ff")
+    js_call(ctx, "fillText", ["Shift: run   Drag: look   Wheel: zoom   Click: move", 14, 26])
+    
     js_set(ctx, "textBaseline", "middle")
     js_set(ctx, "textAlign", "center")
-    js_set(ctx, "font", "10px ui-monospace, monospace")
-    js_set(ctx, "fillStyle", "rgba(150,210,255,0.7)")
-    js_call(ctx, "fillText", ["Shift: run   Drag: look   Wheel: zoom   Click: move", W / 2, 11])
     let bi = 0
     while (bi < rects.length) {
       let r = rects[bi]

@@ -4,7 +4,7 @@
 
 export fn createHud(gpu, host) {
   let W = 330
-  let H = 116
+  let H = 60
   let oc = js_new("OffscreenCanvas", [W, H])
   let ctx = js_call(oc, "getContext", ["2d"])
   let tex = gpu.createTexture(W, H, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER)
@@ -27,16 +27,16 @@ export fn createHud(gpu, host) {
     primitive: { topology: "triangle-strip" }
   })
 
-  // NDC rect anchored top-right (rect = x0, yTop, x1, yBottom; y up).
+  // NDC rect anchored bottom-center (rect = x0, yTop, x1, yBottom; y up).
   let canvas = js_get(host, "canvas")
   let cw = js_get(canvas, "width")
   let chh = js_get(canvas, "height")
   let ndcW = (W * 2.0) / cw
   let ndcH = (H * 2.0) / chh
-  let x1 = 0.97
-  let x0 = x1 - ndcW
-  let yTop = 0.96
-  let yBottom = yTop - ndcH
+  let x0 = 0.0 - ndcW / 2.0
+  let x1 = ndcW / 2.0
+  let yBottom = 0.0 - 0.78
+  let yTop = yBottom + ndcH
   let rectBuf = gpu.createUniform(16)
   gpu.writeBufferF32(rectBuf, 0, [x0, yTop, x1, yBottom])
 

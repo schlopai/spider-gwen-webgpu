@@ -50,7 +50,7 @@ npm run build && npm run preview   # production bundle in dist/, then serve it
 ## Controls
 
 - **WASD** move (camera-relative) · **Shift** run · **Space** jump
-- **Right-drag** orbit camera · **Wheel** zoom · **Click / tap** move-to
+- **Shift** run · **Right-drag** orbit camera · **Wheel / Pinch** zoom · **Click / tap** move-to
 - On-screen **Run / Jump / Hood** buttons · **1–9** action clips · **H** toggle hood
 
 ## How it builds

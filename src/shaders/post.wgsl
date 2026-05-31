@@ -41,10 +41,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let center = uv - vec2<f32>(0.5);
   let dist = length(center);
 
-  // Chromatic aberration — radial RGB split. dist^2 keeps the centre clean and
-  // ramps the split up toward the edges/corners. Kept subtle so the centred
-  // character (esp. the face) reads sharp, not ghosted.
-  let ca = center * (0.0005 + 0.011 * dist * dist);
+  // Chromatic aberration — horizontal RGB split matching the reference shader.
+  // Center is kept sharp; aberration ramps up non-linearly towards the lens edges.
+  let edgeDist = dot(center, center) * 4.0;
+  let current_aberration = 0.0003 + 0.006 * edgeDist * edgeDist;
+  let ca = vec2<f32>(current_aberration, 0.0);
   var col: vec3<f32>;
   col.r = textureSample(screenTexture, screenSampler, uv + ca).r;
   col.g = textureSample(screenTexture, screenSampler, uv).g;
@@ -67,12 +68,20 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
       vec2<f32>(0.0, 0.5), vec2<f32>(0.43, 0.25), vec2<f32>(0.43, -0.25),
       vec2<f32>(0.0, -0.5), vec2<f32>(-0.43, -0.25), vec2<f32>(-0.43, 0.25)
     );
-    let rad = coc * 8.0;
+    let rad = coc * 24.0;
     var blur = vec3<f32>(0.0);
+    var weight = 0.0;
     for (var i = 0u; i < 12u; i = i + 1u) {
-      blur = blur + textureSampleLevel(screenTexture, screenSampler, uv + disk[i] * rad * px, 0.0).rgb;
+      let tap_uv = uv + disk[i] * rad * px;
+      let tap_z = textureLoad(depthTex, vec2<i32>(clamp(tap_uv * texSize, vec2<f32>(0.0), texSize - vec2<f32>(1.0))), 0);
+      let tap_linD = (near * far) / (far - tap_z * (far - near));
+      // Reject taps that hit a sharp foreground object to prevent foreground bleeding (ghosting).
+      if (tap_linD > linD - 2.0) {
+        blur = blur + textureSampleLevel(screenTexture, screenSampler, tap_uv, 0.0).rgb;
+        weight = weight + 1.0;
+      }
     }
-    col = mix(col, blur / 12.0, coc);
+    if (weight > 0.0) { col = mix(col, blur / weight, coc); }
   }
 
   // Bloom — bright-pass neighbour blur (drives the character glow + neon towers).
@@ -122,7 +131,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Dotted halo: bright dots where the pixel is itself dim but borders bright —
   // a glowing dotted ring hugging the character's lit silhouette.
   let ownDim = 1.0 - smoothstep(0.45, 0.78, lum0);
-  ldr = ldr + vec3<f32>(dotFill * nearBright * ownDim * 1.05);
+  ldr = ldr + col * (dotFill * nearBright * ownDim * 1.5);
 
   // Faint dotted comic shading through the midtones (clean at flat black/white).
   let shade = 1.0 - smoothstep(0.25, 0.6, abs(lum0 - 0.42) * 2.2);
