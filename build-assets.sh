@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Optimize the raw Spider-Gwen model into a single self-contained .glb. Run only when
-# the source model changes; the output (src/assets/spider-gwen.glb) is committed and
-# Vite fingerprints it. The 14MB raw source lives in assets-src/ (gitignored).
+# Optimize the raw Spider-Gwen model into a single self-contained .glb. Generated
+# output → gen/spider-gwen.glb (gitignored, regenerated; NOT committed). The raw
+# source lives in assets-src/. `npm run dev`/`build` auto-runs this if the .glb is
+# missing (see the predev/prebuild hooks); run it directly when the source changes.
 #
 # Pipeline is intentionally LOSSLESS and tish-transparent:
 #   - resample: dedup redundant animation keyframes (the bulk — Sketchfab keys every frame)
@@ -14,7 +15,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SRC="$ROOT/assets-src/spider-gwen_-_across_the_spider-verse/scene.gltf"
-OUT="$ROOT/src/assets/spider-gwen.glb"
+OUT="$ROOT/gen/spider-gwen.glb"
 
 if [ ! -f "$SRC" ]; then
   echo "ERROR: raw source not found at $SRC" >&2

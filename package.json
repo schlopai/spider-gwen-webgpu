@@ -5,12 +5,14 @@
   "type": "module",
   "description": "spider3 WebGPU engine ported to tish — written in tish, compiled to bytecode, run on a wasm VM, rendered with WebGPU, bundled with Vite.",
   "scripts": {
+    "predev": "test -f gen/spider-gwen.glb || npm run build:assets",
     "dev": "vite",
+    "prebuild": "test -f gen/spider-gwen.glb || npm run build:assets",
     "build": "vite build",
     "preview": "vite preview",
     "build:runtime": "bash build-runtime.sh",
     "build:assets": "bash build-assets.sh",
-    "clean": "rm -rf dist gen"
+    "clean": "rm -rf dist gen vendor"
   },
   "engines": {
     "node": ">=18"
@@ -19,8 +21,5 @@
     "@gltf-transform/cli": "^4.3.0",
     "vite": "^8.0.14",
     "wasm-opt": "^1.4.0"
-  },
-  "dependencies": {
-    "meshoptimizer": "^1.1.1"
   }
 }
