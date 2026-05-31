@@ -174,7 +174,7 @@ export fn createAnimator(restTRS, nodeCount) {
     }
   }
 
-  let self = { clips: [], current: 0 - 1, previous: 0 - 1, time: 0, prevTime: 0, fade: 1.0, fadeDur: 0.2, loop: true, trs: trs }
+  let self = { clips: [], current: 0 - 1, previous: 0 - 1, time: 0, prevTime: 0, fade: 1.0, fadeDur: 0.32, loop: true, trs: trs }
   self.setClips = (c) => { self.clips = c }
   self.play = (idx, loop) => {
     if (self.current !== idx) {
@@ -205,7 +205,10 @@ export fn createAnimator(restTRS, nodeCount) {
         self.fade = self.fade + dt / self.fadeDur
         if (self.fade > 1.0) { self.fade = 1.0 }
         sampleClipInto(self.clips[self.previous], self.prevTime, prevBuf)
-        blendInto(trs, prevBuf, curBuf, self.fade)
+        // Smoothstep ease so the crossfade eases in/out (no linear pop at the
+        // ends) — much smoother than blending on the raw linear weight.
+        let w = self.fade * self.fade * (3.0 - 2.0 * self.fade)
+        blendInto(trs, prevBuf, curBuf, w)
         if (self.fade >= 1.0) { self.previous = 0 - 1 }
         return trs
       }

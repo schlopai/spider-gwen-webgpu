@@ -42,8 +42,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let dist = length(center);
 
   // Chromatic aberration — radial RGB split. dist^2 keeps the centre clean and
-  // ramps the split up hard toward the rounded edges/corners.
-  let ca = center * (0.0012 + 0.04 * dist * dist);
+  // ramps the split up toward the edges/corners. Kept subtle so the centred
+  // character (esp. the face) reads sharp, not ghosted.
+  let ca = center * (0.0005 + 0.011 * dist * dist);
   var col: vec3<f32>;
   col.r = textureSample(screenTexture, screenSampler, uv + ca).r;
   col.g = textureSample(screenTexture, screenSampler, uv).g;
@@ -56,15 +57,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let near = 0.1;
   let far = 1000.0;
   let linD = (near * far) / (far - zndc * (far - near));
-  let coc = clamp(abs(linD - post.focusDist) / 9.0, 0.0, 1.0);
-  if (coc > 0.02) {
+  // Wide focus band (/22) + dead-zone so the whole character stays sharp; only
+  // the far skyline drifts out of focus.
+  let coc = clamp((abs(linD - post.focusDist) - 2.5) / 22.0, 0.0, 1.0);
+  if (coc > 0.05) {
     var disk = array<vec2<f32>, 12>(
       vec2<f32>(0.0, 1.0), vec2<f32>(0.87, 0.5), vec2<f32>(0.87, -0.5),
       vec2<f32>(0.0, -1.0), vec2<f32>(-0.87, -0.5), vec2<f32>(-0.87, 0.5),
       vec2<f32>(0.0, 0.5), vec2<f32>(0.43, 0.25), vec2<f32>(0.43, -0.25),
       vec2<f32>(0.0, -0.5), vec2<f32>(-0.43, -0.25), vec2<f32>(-0.43, 0.25)
     );
-    let rad = coc * 11.0;
+    let rad = coc * 8.0;
     var blur = vec3<f32>(0.0);
     for (var i = 0u; i < 12u; i = i + 1u) {
       blur = blur + textureSampleLevel(screenTexture, screenSampler, uv + disk[i] * rad * px, 0.0).rgb;
@@ -80,13 +83,49 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     vec2<f32>(-1.0, 1.0), vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0)
   );
   for (var i = 0u; i < 9u; i = i + 1u) {
-    let s = textureSample(screenTexture, screenSampler, uv + offsets[i] * px * 5.0).rgb;
+    let s = textureSample(screenTexture, screenSampler, uv + offsets[i] * px * 2.5).rgb;
     let l = luma(s);
-    if (l > 0.6) { bloom = bloom + s * (l - 0.6); }
+    // Higher threshold so the lit (but not blown-out) face/hood stays crisp;
+    // only genuine highlights (neon towers, rim glints) bloom.
+    if (l > 0.82) { bloom = bloom + s * (l - 0.82); }
   }
   bloom = bloom / 9.0;
 
-  var ldr = aces(col + bloom * 2.0);
+  var ldr = aces(col + bloom * 1.2);
+
+  // Halftone (Ben-Day dots) — the "Into the Spider-Verse" comic look. A rotated
+  // dot screen; the dots light up in the bright-rim RING around the character and
+  // neon (the dotted halo), plus a faint dotted texture through the shaded
+  // midtones. Driven by NEIGHBOUR brightness and masked out of the flat-bright
+  // hood/face, so it reads as a glowing dotted halo, not a fill — the sharp face
+  // stays clean.
+  let lum0 = luma(ldr);
+  let pxc = uv * texSize;
+  let ha = 0.46;
+  let hcs = cos(ha);
+  let hsn = sin(ha);
+  let hrot = vec2<f32>(pxc.x * hcs - pxc.y * hsn, pxc.x * hsn + pxc.y * hcs);
+  let hd = length(fract(hrot / 9.0) - vec2<f32>(0.5)) * 2.0;   // 0 dot-centre … 1 corner
+  let dotFill = 1.0 - smoothstep(0.30, 0.55, hd);              // filled-dot footprint
+
+  // Wide bright-pass → how close this pixel is to a bright area (the rim glow ring).
+  var nearBright = 0.0;
+  let hoff = array<vec2<f32>, 8>(
+    vec2<f32>(1.0, 0.0), vec2<f32>(-1.0, 0.0), vec2<f32>(0.0, 1.0), vec2<f32>(0.0, -1.0),
+    vec2<f32>(0.7, 0.7), vec2<f32>(-0.7, 0.7), vec2<f32>(0.7, -0.7), vec2<f32>(-0.7, -0.7)
+  );
+  for (var i = 0u; i < 8u; i = i + 1u) {
+    nearBright = nearBright + max(luma(textureSample(screenTexture, screenSampler, uv + hoff[i] * px * 7.0).rgb) - 0.70, 0.0);
+  }
+  nearBright = clamp(nearBright, 0.0, 1.0);
+
+  // Dotted halo: bright dots where the pixel is itself dim but borders bright.
+  let ownDim = 1.0 - smoothstep(0.45, 0.75, lum0);
+  ldr = ldr + vec3<f32>(dotFill * nearBright * ownDim * 0.7);
+
+  // Faint dotted comic shading through the midtones (clean at flat black/white).
+  let shade = 1.0 - smoothstep(0.25, 0.6, abs(lum0 - 0.42) * 2.2);
+  ldr = ldr * (1.0 - dotFill * shade * 0.2);
 
   // Vignette.
   let vig = 1.0 - smoothstep(0.45, 0.9, dist);

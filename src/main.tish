@@ -239,19 +239,16 @@ fn frame(ts) {
   mat4Multiply(shadowModel16, shadowMat, model16)
   gpu.writeBufferF32(shadowModelBuf, 0, shadowModel16)
 
-  // Orbit camera around the smoothed follow target.
+  // Orbit camera: both the follow target and the eye are smoothed in the
+  // controller (camTarget + camPos lerps), so drag/zoom ease in, not snap.
   let t = controller.camTarget
   let tx = t[0]
   let ty = t[1]
   let tz = t[2]
-  let cm = controller.cam
-  let cp = Math.cos(cm.pitch)
-  let sp = Math.sin(cm.pitch)
-  let cyw = Math.cos(cm.yaw)
-  let syw = Math.sin(cm.yaw)
-  let ex = tx + cm.dist * cp * syw
-  let ey = ty + cm.dist * sp
-  let ez = tz + cm.dist * cp * cyw
+  let e = controller.camPos
+  let ex = e[0]
+  let ey = e[1]
+  let ez = e[2]
   // near/far MUST match post.wgsl's depth linearization (0.1 / 1000) so the DoF
   // focus plane lands on the character (focusDist = cam.dist) at any zoom.
   mat4PerspectiveZO(proj, 0.85, aspect, 0.1, 1000.0)

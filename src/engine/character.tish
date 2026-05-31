@@ -26,20 +26,23 @@ export fn createController(host, animator, clips) {
   let pos = [0, 0, 0]
   let vel = [0, 0, 0]
   let camTarget = [0, 1, 0]
+  let camPos = [0, 3, 6]
   let cam = { yaw: 0, pitch: 0.35, dist: 6.0 }
   let state = {
     facing: 0, grounded: true, anim: 0 - 1, moving: false,
     hoodUp: true, hoodHeld: false, jumpHeld: false, actionTime: 0,
-    navActive: false, navX: 0, navZ: 0
+    navActive: false, navX: 0, navZ: 0, camSnapped: false
   }
 
   // Locomotion clips by name ("dash" is the run cycle; there's no run clip).
   let IDLE = findClip(clips, "@idle")
   let WALK = findClip(clips, "@walk")
   let DASH = findClip(clips, "@dash")
+  let JUMP = findClip(clips, "@skill01")
   if (IDLE < 0) { IDLE = 0 }
   if (WALK < 0) { WALK = IDLE }
   if (DASH < 0) { DASH = WALK }
+  if (JUMP < 0) { JUMP = IDLE }
 
   // Action clips bound to Digit1..Digit9.
   let actionDefs = [
@@ -64,7 +67,7 @@ export fn createController(host, animator, clips) {
     return 0
   }
 
-  let self = { pos: pos, vel: vel, cam: cam, state: state, camTarget: camTarget }
+  let self = { pos: pos, vel: vel, cam: cam, state: state, camTarget: camTarget, camPos: camPos }
   self.setMoveTarget = (x, z) => { state.navActive = true; state.navX = x; state.navZ = z }
   self.setAnim = (idx) => {
     if (state.anim !== idx) { state.anim = idx; animator.play(idx, true) }
@@ -159,11 +162,29 @@ export fn createController(host, animator, clips) {
     pos[2] = pos[2] + vel[2] * dt
     if (pos[1] <= 0) { pos[1] = 0; vel[1] = 0; state.grounded = true }
 
-    // Smooth camera target.
+    // Smooth camera target (follow point).
     let a = 1.0 - Math.exp(0 - 10.0 * dt)
     camTarget[0] = camTarget[0] + (pos[0] - camTarget[0]) * a
     camTarget[1] = camTarget[1] + (pos[1] + 1.0 - camTarget[1]) * a
     camTarget[2] = camTarget[2] + (pos[2] - camTarget[2]) * a
+
+    // Smooth orbit eye: yaw/pitch/dist update instantly from input, but the eye
+    // LERPS toward the desired orbit position so drag-rotate and wheel-zoom ease
+    // in instead of snapping (matches the original's cameraPosition lerp).
+    let cpit = Math.cos(cam.pitch)
+    let spit = Math.sin(cam.pitch)
+    let cyaw = Math.cos(cam.yaw)
+    let syaw = Math.sin(cam.yaw)
+    let dex = camTarget[0] + cam.dist * cpit * syaw
+    let dey = camTarget[1] + cam.dist * spit
+    let dez = camTarget[2] + cam.dist * cpit * cyaw
+    if (state.camSnapped) {
+      camPos[0] = camPos[0] + (dex - camPos[0]) * a
+      camPos[1] = camPos[1] + (dey - camPos[1]) * a
+      camPos[2] = camPos[2] + (dez - camPos[2]) * a
+    } else {
+      camPos[0] = dex; camPos[1] = dey; camPos[2] = dez; state.camSnapped = true
+    }
 
     // Animation state: an active action plays out before locomotion resumes.
     if (state.actionTime > 0) {
@@ -175,6 +196,9 @@ export fn createController(host, animator, clips) {
         } else {
           self.setAnim(IDLE)
         }
+      } else {
+        // Airborne: hold the jump pose (non-looping crossfade) until landing.
+        if (state.anim !== JUMP) { state.anim = JUMP; animator.play(JUMP, false) }
       }
     }
   }
