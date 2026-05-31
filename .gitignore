@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+gen/
+*.local
+.DS_Store
+*.log
+
+# Raw model source (14MB) kept locally for re-optimization only; the committed,
+# optimized src/assets/spider-gwen.glb is what ships. Recoverable from spider3/public.
+
+# Vendor runtime IS committed (prebuilt wasm VM); only its generated types are not.
+vendor/*.d.ts

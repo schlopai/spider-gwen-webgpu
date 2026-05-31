@@ -1,5 +1,3 @@
-/* @ts-self-types="./tish_vm.d.ts" */
-
 /**
  * @param {Uint8Array} chunk
  */

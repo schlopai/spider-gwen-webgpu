@@ -1,0 +1,250 @@
+// Host boot loader for spider3-tish. Bundled by Vite. Bootstraps WebGPU, loads the
+// model + shaders, instantiates the prebuilt tish wasm VM, and hands it an `env`
+// object; the engine itself is tish bytecode (gen/chunk.bin) run by the VM.
+//
+// Everything below the imports is irreducible browser glue: WebGPU, fetch, and DOM
+// input events are JS-only APIs. The dev-only pixel-readback helpers are stripped
+// from production builds via `import.meta.env.DEV`.
+import init, { start, tick_once } from '../vendor/tish_vm.js';
+import wasmUrl from '../vendor/tish_vm_bg.wasm?url';
+import chunkUrl from '../gen/chunk.bin?url';
+
+import mainWGSL from './shaders/main.wgsl?raw';
+import postWGSL from './shaders/post.wgsl?raw';
+import hudWGSL from './shaders/hud.wgsl?raw';
+import skinningWGSL from './shaders/skinning.wgsl?raw';
+import shadowWGSL from './shaders/shadow.wgsl?raw';
+
+// Optimized model: single self-contained .glb (build:assets), fingerprinted by Vite.
+import glbUrl from './assets/spider-gwen.glb?url';
+
+const fail = (msg) => {
+  const el = document.getElementById('err');
+  el.style.display = 'block';
+  el.textContent = String(msg);
+  console.error(msg);
+};
+
+// Host-side model ingestion. Parses a binary .glb container (or a plain .gltf +
+// external buffers), exposes typed-array accessor views + decoded images; tish walks
+// the JSON and builds GPU buffers (it has no typed arrays / fetch / image decode).
+// Returns { json, accessor(idx,asU16)->TypedArray, images[] }.
+async function loadModel(url) {
+  const baseUrl = new URL(url, location.href);
+  const head = await (await fetch(baseUrl)).arrayBuffer();
+  const dv = new DataView(head);
+  let json, bin = null;
+  if (dv.getUint32(0, true) === 0x46546c67) { // 'glTF' magic → binary GLB
+    let off = 12; // skip 12-byte header (magic, version, total length)
+    while (off + 8 <= dv.byteLength) {
+      const clen = dv.getUint32(off, true), ctype = dv.getUint32(off + 4, true);
+      const data = head.slice(off + 8, off + 8 + clen);
+      if (ctype === 0x4e4f534a) json = JSON.parse(new TextDecoder().decode(data)); // 'JSON'
+      else if (ctype === 0x004e4942) bin = data; // 'BIN\0'
+      off += 8 + clen; // chunkLength is 4-byte aligned per the GLB spec
+    }
+  } else {
+    json = JSON.parse(new TextDecoder().decode(head));
+  }
+  // EXT_texture_webp: with no PNG fallback there is no top-level texture.source, so
+  // surface the extension's source — the engine's `texture.source` lookup is unchanged.
+  if (json.textures) for (const t of json.textures) {
+    const ext = t.extensions && t.extensions.EXT_texture_webp;
+    if (ext && t.source == null) t.source = ext.source;
+  }
+  // One embedded buffer for GLB; external uris for a plain .gltf.
+  const buffers = bin
+    ? [bin]
+    : await Promise.all(json.buffers.map((b) => fetch(new URL(b.uri, baseUrl)).then((r) => r.arrayBuffer())));
+  const compCount = (t) => ({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[t] || 1);
+  const TA = { 5126: Float32Array, 5125: Uint32Array, 5123: Uint16Array, 5121: Uint8Array };
+  const accessor = (idx, asU16) => {
+    const a = json.accessors[idx], v = json.bufferViews[a.bufferView], buf = buffers[v.buffer];
+    const nc = compCount(a.type), Ctor = TA[a.componentType];
+    const base = (v.byteOffset || 0) + (a.byteOffset || 0);
+    const stride = v.byteStride || 0;
+    let arr;
+    if (!stride || stride === nc * Ctor.BYTES_PER_ELEMENT) {
+      arr = new Ctor(buf, base, a.count * nc); // tightly packed → direct view
+    } else {
+      // Interleaved bufferView (optimized glb shares one strided buffer across
+      // attributes) → de-interleave into a packed per-attribute array, which is
+      // what the engine's per-attribute vertex buffers expect.
+      arr = new Ctor(a.count * nc);
+      const whole = new Ctor(buf); // element-indexed view of the whole buffer
+      const start = base / Ctor.BYTES_PER_ELEMENT; // base is element-aligned per spec
+      const strideEls = stride / Ctor.BYTES_PER_ELEMENT;
+      for (let i = 0; i < a.count; i++) {
+        const o = start + i * strideEls;
+        for (let c = 0; c < nc; c++) arr[i * nc + c] = whole[o + c];
+      }
+    }
+    if (asU16 && !(arr instanceof Uint16Array)) arr = new Uint16Array(arr);
+    return arr;
+  };
+  // Images: bufferView-embedded (GLB, e.g. EXT_texture_webp) or external uri (.gltf).
+  const images = [];
+  if (json.images) for (const im of json.images) {
+    let blob;
+    if (im.uri != null) {
+      blob = await fetch(new URL(im.uri, baseUrl)).then((r) => r.blob());
+    } else {
+      const v = json.bufferViews[im.bufferView];
+      blob = new Blob([new Uint8Array(buffers[v.buffer], v.byteOffset || 0, v.byteLength)],
+        { type: im.mimeType || 'image/png' });
+    }
+    images.push(await createImageBitmap(blob));
+  }
+  return { json, accessor, images };
+}
+
+function sizeCanvas(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth || window.innerWidth || 1280;
+  const cssH = canvas.clientHeight || window.innerHeight || 720;
+  const w = Math.max(1, Math.floor(cssW * dpr));
+  const h = Math.max(1, Math.floor(cssH * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+
+async function main() {
+  const canvas = document.getElementById('gpu');
+  sizeCanvas(canvas);
+  new ResizeObserver(() => sizeCanvas(canvas)).observe(canvas);
+  window.addEventListener('resize', () => sizeCanvas(canvas));
+
+  // Input: capture DOM events into a plain object the tish side reads via FFI
+  // each frame (avoids marshalling live Event objects across the bridge).
+  const input = { keys: {}, lookDx: 0, lookDy: 0, dragging: false, wheel: 0, tapNx: 0, tapNy: 0, tapReady: false };
+  window.__input = input;
+  let _dnX = 0, _dnY = 0, _dnT = 0, _moved = false;
+  const _btnPointers = new Map();
+  // Hit-test the tish-exposed on-screen button rects (NDC); returns a key code.
+  const hitButton = (clientX, clientY) => {
+    const btns = window.__buttons;
+    if (!btns) return null;
+    const r = canvas.getBoundingClientRect();
+    const nx = ((clientX - r.left) / r.width) * 2 - 1;
+    const ny = 1 - ((clientY - r.top) / r.height) * 2;
+    for (const b of btns) {
+      if (nx >= b.x0 && nx <= b.x1 && ny <= b.yTop && ny >= b.yBot) return b.code;
+    }
+    return null;
+  };
+  addEventListener('keydown', (e) => { input.keys[e.code] = true; });
+  addEventListener('keyup', (e) => { input.keys[e.code] = false; });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('pointerdown', (e) => {
+    const code = hitButton(e.clientX, e.clientY);
+    if (code) {
+      input.keys[code] = true; _btnPointers.set(e.pointerId, code);
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      return; // a button press is not a look-drag or a move-to
+    }
+    input.dragging = true; _dnX = e.clientX; _dnY = e.clientY; _dnT = performance.now(); _moved = false;
+  });
+  addEventListener('pointermove', (e) => {
+    if (input.dragging) {
+      input.lookDx += e.movementX; input.lookDy += e.movementY;
+      if (Math.abs(e.clientX - _dnX) > 6 || Math.abs(e.clientY - _dnY) > 6) _moved = true;
+    }
+  });
+  addEventListener('pointerup', (e) => {
+    if (_btnPointers.has(e.pointerId)) {
+      input.keys[_btnPointers.get(e.pointerId)] = false; _btnPointers.delete(e.pointerId);
+      return;
+    }
+    input.dragging = false;
+    // A quick, stationary click/tap = move-to (unprojected to the ground in tish).
+    if (!_moved && (performance.now() - _dnT) < 350) {
+      const r = canvas.getBoundingClientRect();
+      input.tapNx = ((e.clientX - r.left) / r.width) * 2 - 1;
+      input.tapNy = 1 - ((e.clientY - r.top) / r.height) * 2;
+      input.tapReady = true;
+    }
+  });
+  canvas.addEventListener('wheel', (e) => { input.wheel += e.deltaY; e.preventDefault(); }, { passive: false });
+
+  if (!navigator.gpu) return fail('WebGPU not supported in this browser.');
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) return fail('No WebGPU adapter.');
+  const device = await adapter.requestDevice();
+  const context = canvas.getContext('webgpu');
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  // COPY_SRC lets us read back the swapchain for deterministic verification
+  // (screenshots are unreliable when the preview tab is throttled/offscreen).
+  context.configure({ device, format, alphaMode: 'opaque',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+
+  window.__gpuError = null;
+  device.addEventListener('uncapturederror', (e) => {
+    window.__gpuError = String(e.error && e.error.message ? e.error.message : e.error);
+    console.error('UNCAPTURED', e.error);
+  });
+
+  // Instantiate the prebuilt tish VM (wasm-bindgen --target web). Passing an
+  // explicit URL avoids the glue's no-arg `new URL(..., import.meta.url)` path.
+  await init({ module_or_path: wasmUrl });
+  // Raw serialized bytecode (tish build --target bytecode); start() wants raw bytes.
+  const chunk = new Uint8Array(await (await fetch(chunkUrl)).arrayBuffer());
+
+  const gltf = await loadModel(glbUrl);
+
+  // Original WGSL shaders, inlined by Vite (?raw) instead of fetched at runtime.
+  const shaders = { main: mainWGSL, post: postWGSL, hud: hudWGSL, skinning: skinningWGSL, shadow: shadowWGSL };
+
+  const env = {
+    device, queue: device.queue, context, format, canvas,
+    gltf: gltf.json, accessor: gltf.accessor, images: gltf.images,
+    imageSize: (i) => [gltf.images[i].width, gltf.images[i].height],
+    shaders, input,
+    zerosF32: (n) => new Float32Array(n),
+    zerosU16: (n) => new Uint16Array(n),
+    makeI32: (arr) => Int32Array.from(arr),
+    makeU32: (arr) => Uint32Array.from(arr),
+    makeF32: (arr) => Float32Array.from(arr),
+  };
+  window.__env = env;
+
+  // Dev-only deterministic verification helpers (single-frame driver + GPU pixel
+  // readback), used when rAF is throttled in a hidden/offscreen tab. Stripped from
+  // production: `import.meta.env.DEV` folds to false and the block is dead-code-eliminated.
+  if (import.meta.env.DEV) {
+    window.__tick = (ts) => tick_once(typeof ts === 'number' ? ts : performance.now());
+    // Read back one pixel of a GIVEN texture at fractional coords (0..1), as
+    // [r,g,b,a] 0-255 (handles bgra vs rgba). Deterministic regardless of
+    // compositing — the copy snapshots the texture into a buffer immediately.
+    const readPixelFromTex = async (tex, fx, fy) => {
+      const x = Math.min(tex.width - 1, Math.max(0, Math.floor(fx * tex.width)));
+      const y = Math.min(tex.height - 1, Math.max(0, Math.floor(fy * tex.height)));
+      const buf = device.createBuffer({ size: 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      const enc = device.createCommandEncoder();
+      enc.copyTextureToBuffer({ texture: tex, origin: { x, y, z: 0 } },
+        { buffer: buf, bytesPerRow: 256 }, { width: 1, height: 1, depthOrArrayLayers: 1 });
+      device.queue.submit([enc.finish()]);
+      await buf.mapAsync(GPUMapMode.READ);
+      const d = new Uint8Array(buf.getMappedRange().slice(0, 4));
+      const out = format.startsWith('bgra') ? [d[2], d[1], d[0], d[3]] : [d[0], d[1], d[2], d[3]];
+      buf.unmap(); buf.destroy();
+      return out;
+    };
+    window.__readPixel = (fx = 0.5, fy = 0.5) => readPixelFromTex(context.getCurrentTexture(), fx, fy);
+    // Render one frame at ts, then read N points from the SAME rendered texture
+    // (getCurrentTexture rotates between calls, so capture it once). points: [[fx,fy],...]
+    window.__readPoints = async (ts, points) => {
+      tick_once(ts);
+      const tex = context.getCurrentTexture();
+      const out = [];
+      for (const p of points) out.push(await readPixelFromTex(tex, p[0], p[1]));
+      return out;
+    };
+    window.__tickRead = async (ts, fx, fy) => (await window.__readPoints(ts, [[fx ?? 0.5, fy ?? 0.5]]))[0];
+  }
+
+  try {
+    start(chunk, env);
+  } catch (e) {
+    fail('start() threw: ' + (e && e.message ? e.message : e));
+  }
+}
+main().catch(fail);

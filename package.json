@@ -2,18 +2,25 @@
   "name": "spider3-tish",
   "version": "0.1.0",
   "private": true,
-  "description": "spider3 WebGPU engine ported to tish — written in tish, compiled to wasm, rendered with WebGPU.",
+  "type": "module",
+  "description": "spider3 WebGPU engine ported to tish — written in tish, compiled to bytecode, run on a wasm VM, rendered with WebGPU, bundled with Vite.",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "build:runtime": "bash build-runtime.sh",
-    "build": "bash build.sh",
-    "build:all": "bash build-runtime.sh && bash build.sh",
-    "start": "node serve.mjs",
-    "serve": "node serve.mjs",
-    "dev": "bash build.sh && node serve.mjs",
-    "setup": "bash build-runtime.sh && bash build.sh && node serve.mjs",
-    "clean": "rm -rf dist/_gen dist/chunk.b64"
+    "build:assets": "bash build-assets.sh",
+    "clean": "rm -rf dist gen"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.3.0",
+    "vite": "^8.0.14",
+    "wasm-opt": "^1.4.0"
+  },
+  "dependencies": {
+    "meshoptimizer": "^1.1.1"
   }
 }
