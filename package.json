@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "spider3 WebGPU engine ported to tish — written in tish, compiled to bytecode, run on a wasm VM, rendered with WebGPU, bundled with Vite.",
+  "license": "PIF",
+  "description": "WASM + WebGPU engine — written in tish, compiled to bytecode, run on a wasm VM, rendered with WebGPU, bundled with Vite.",
   "scripts": {
     "predev": "test -f gen/spider-gwen.glb || npm run build:assets",
     "dev": "vite",

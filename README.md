@@ -1,4 +1,4 @@
-# Spider-Gwen - Across the Spider-Verse WebGPU demo
+# Spider-Gwen WASM + WebGPU demo
 
 Written in tish, compiled to a bytecode chunk, run on a prebuilt wasm VM, rendering through browser **WebGPU**. An interactive, GPU-skinned, animated Spider-Gwen running through a neon
 Spider-Verse city — glTF loading, GPU skeletal skinning, keyframe animation, a character
