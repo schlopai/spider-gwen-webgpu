@@ -1,0 +1,64 @@
+// engine/primitives.tish — procedural box geometry for the environment (ground
+// + neon towers). Static meshes upload zero joints/weights, so main.wgsl's
+// skinning falls back to identity (weightSum < 0.01).
+
+export fn createBox(gpu, host) {
+  let positions = []
+  let normals = []
+  let uvs = []
+  let indices = []
+
+  // Each face: [normal, u-axis, v-axis].
+  let faces = [
+    [[1,0,0],  [0,0,-1], [0,1,0]],
+    [[-1,0,0], [0,0,1],  [0,1,0]],
+    [[0,1,0],  [1,0,0],  [0,0,1]],
+    [[0,-1,0], [1,0,0],  [0,0,-1]],
+    [[0,0,1],  [1,0,0],  [0,1,0]],
+    [[0,0,-1], [-1,0,0], [0,1,0]]
+  ]
+  let corners = [[-1,-1], [1,-1], [1,1], [-1,1]]
+
+  let fi = 0
+  while (fi < 6) {
+    let face = faces[fi]
+    let nrm = face[0]
+    let ua = face[1]
+    let va = face[2]
+    let base = positions.length / 3
+    let ci = 0
+    while (ci < 4) {
+      let cc = corners[ci]
+      positions.push(nrm[0]*0.5 + ua[0]*0.5*cc[0] + va[0]*0.5*cc[1])
+      positions.push(nrm[1]*0.5 + ua[1]*0.5*cc[0] + va[1]*0.5*cc[1])
+      positions.push(nrm[2]*0.5 + ua[2]*0.5*cc[0] + va[2]*0.5*cc[1])
+      normals.push(nrm[0]); normals.push(nrm[1]); normals.push(nrm[2])
+      uvs.push((cc[0] + 1) / 2); uvs.push((cc[1] + 1) / 2)
+      ci = ci + 1
+    }
+    indices.push(base); indices.push(base + 1); indices.push(base + 2)
+    indices.push(base); indices.push(base + 2); indices.push(base + 3)
+    fi = fi + 1
+  }
+
+  let vcount = positions.length / 3
+  let VB = gpu.BUFFER.VERTEX | gpu.BUFFER.COPY_DST
+
+  let posBuf = gpu.createBuffer(vcount * 3 * 4, VB)
+  gpu.writeBufferF32(posBuf, 0, positions)
+  let uvBuf = gpu.createBuffer(vcount * 2 * 4, VB)
+  gpu.writeBufferF32(uvBuf, 0, uvs)
+  let normBuf = gpu.createBuffer(vcount * 3 * 4, VB)
+  gpu.writeBufferF32(normBuf, 0, normals)
+  let jointsBuf = gpu.createBuffer(vcount * 4 * 2, VB)
+  gpu.writeBuffer(jointsBuf, 0, js_call(host, "zerosU16", [vcount * 4]))
+  let weightsBuf = gpu.createBuffer(vcount * 4 * 4, VB)
+  gpu.writeBuffer(weightsBuf, 0, js_call(host, "zerosF32", [vcount * 4]))
+  let indexBuf = gpu.createBuffer(indices.length * 2, gpu.BUFFER.INDEX | gpu.BUFFER.COPY_DST)
+  gpu.writeBufferU16(indexBuf, 0, indices)
+
+  return {
+    posBuf: posBuf, uvBuf: uvBuf, normBuf: normBuf, jointsBuf: jointsBuf, weightsBuf: weightsBuf,
+    indexBuf: indexBuf, indexCount: indices.length, indexFormat: "uint16"
+  }
+}

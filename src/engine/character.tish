@@ -1,0 +1,183 @@
+// engine/character.tish — third-person controller: camera-relative WASD, run,
+// gravity/jump/ground, orbit follow-cam (smoothed), action hotkeys (Digit1-9 →
+// one-shot clips), hood toggle (H), and click/tap-to-move. Reads the host input
+// object via the FFI each frame.
+//
+// Closure-scoping rule: anything the update closure calls must be a global, an
+// object method, or a local of createController. pos/vel/camTarget/held are
+// captured LOCAL arrays (index-assignment must target a local); cam/state hold
+// scalars (object scalar-field assignment is fine).
+
+// Find a clip whose name contains `suffix` (case-insensitive). -1 if none.
+fn findClip(clips, suffix) {
+  let i = 0
+  while (i < clips.length) {
+    let nm = clips[i].name
+    if (nm !== null) {
+      if (nm.toLowerCase().indexOf(suffix) >= 0) { return i }
+    }
+    i = i + 1
+  }
+  return 0 - 1
+}
+
+export fn createController(host, animator, clips) {
+  let input = js_get(host, "input")
+  let pos = [0, 0, 0]
+  let vel = [0, 0, 0]
+  let camTarget = [0, 1, 0]
+  let cam = { yaw: 0, pitch: 0.35, dist: 6.0 }
+  let state = {
+    facing: 0, grounded: true, anim: 0 - 1, moving: false,
+    hoodUp: true, hoodHeld: false, jumpHeld: false, actionTime: 0,
+    navActive: false, navX: 0, navZ: 0
+  }
+
+  // Locomotion clips by name ("dash" is the run cycle; there's no run clip).
+  let IDLE = findClip(clips, "@idle")
+  let WALK = findClip(clips, "@walk")
+  let DASH = findClip(clips, "@dash")
+  if (IDLE < 0) { IDLE = 0 }
+  if (WALK < 0) { WALK = IDLE }
+  if (DASH < 0) { DASH = WALK }
+
+  // Action clips bound to Digit1..Digit9.
+  let actionDefs = [
+    { code: "Digit1", anim: "@atk01" }, { code: "Digit2", anim: "@atk02" }, { code: "Digit3", anim: "@atk03" },
+    { code: "Digit4", anim: "@skill01-01" }, { code: "Digit5", anim: "@skill02" }, { code: "Digit6", anim: "@skill03-01" },
+    { code: "Digit7", anim: "@skill04-01" }, { code: "Digit8", anim: "@skill05-01" }, { code: "Digit9", anim: "@hit" }
+  ]
+  let actions = []
+  let held = []
+  let ai = 0
+  while (ai < actionDefs.length) {
+    let idx = findClip(clips, actionDefs[ai].anim)
+    let dur = 0
+    if (idx >= 0) { dur = clips[idx].duration }
+    actions.push({ code: actionDefs[ai].code, idx: idx, dur: dur })
+    held.push(false)
+    ai = ai + 1
+  }
+
+  fn keyDown(keys, code) {
+    if (js_get(keys, code) === true) { return 1 }
+    return 0
+  }
+
+  let self = { pos: pos, vel: vel, cam: cam, state: state, camTarget: camTarget }
+  self.setMoveTarget = (x, z) => { state.navActive = true; state.navX = x; state.navZ = z }
+  self.setAnim = (idx) => {
+    if (state.anim !== idx) { state.anim = idx; animator.play(idx, true) }
+  }
+
+  self.update = (dt) => {
+    // Camera orbit from drag + wheel zoom.
+    cam.yaw = cam.yaw - js_get(input, "lookDx") * 0.005
+    cam.pitch = cam.pitch + js_get(input, "lookDy") * 0.005
+    js_set(input, "lookDx", 0)
+    js_set(input, "lookDy", 0)
+    if (cam.pitch < 0.05) { cam.pitch = 0.05 }
+    if (cam.pitch > 1.4) { cam.pitch = 1.4 }
+    cam.dist = cam.dist + js_get(input, "wheel") * 0.01
+    js_set(input, "wheel", 0)
+    if (cam.dist < 2.5) { cam.dist = 2.5 }
+    if (cam.dist > 16.0) { cam.dist = 16.0 }
+
+    let keys = js_get(input, "keys")
+
+    // Hood toggle (H, edge-triggered).
+    let hd = keyDown(keys, "KeyH") > 0
+    if (hd) { if (!state.hoodHeld) { state.hoodUp = !state.hoodUp } }
+    state.hoodHeld = hd
+
+    // Action hotkeys (Digit1-9, edge-triggered one-shot, override locomotion).
+    let aj = 0
+    while (aj < actions.length) {
+      let act = actions[aj]
+      let down = keyDown(keys, act.code) > 0
+      if (down) {
+        if (!held[aj]) {
+          if (act.idx >= 0) {
+            animator.play(act.idx, false)
+            state.anim = 0 - 2
+            state.actionTime = act.dur
+          }
+        }
+      }
+      held[aj] = down
+      aj = aj + 1
+    }
+
+    // Camera-relative WASD.
+    let fwd = keyDown(keys, "KeyW") - keyDown(keys, "KeyS")
+    let strafe = keyDown(keys, "KeyD") - keyDown(keys, "KeyA")
+    let sy = Math.sin(cam.yaw)
+    let cy = Math.cos(cam.yaw)
+    let moveX = fwd * (0 - sy) + strafe * cy
+    let moveZ = fwd * (0 - cy) + strafe * (0 - sy)
+    let len = Math.sqrt(moveX * moveX + moveZ * moveZ)
+    let speed = 4.0
+    if (keyDown(keys, "ShiftLeft") > 0) { speed = 13.0 }
+
+    if (len > 0.01) {
+      state.navActive = false
+      moveX = moveX / len
+      moveZ = moveZ / len
+      vel[0] = moveX * speed
+      vel[2] = moveZ * speed
+      state.facing = Math.atan2(moveX, moveZ)
+      state.moving = true
+    } else {
+      if (state.navActive) {
+        let dx = state.navX - pos[0]
+        let dz = state.navZ - pos[2]
+        let d = Math.sqrt(dx * dx + dz * dz)
+        if (d > 0.5) {
+          let s = 4.0 / d
+          vel[0] = dx * s
+          vel[2] = dz * s
+          state.facing = Math.atan2(dx, dz)
+          state.moving = true
+        } else {
+          state.navActive = false
+          vel[0] = 0; vel[2] = 0; state.moving = false
+        }
+      } else {
+        vel[0] = 0; vel[2] = 0; state.moving = false
+      }
+    }
+
+    // Gravity + jump.
+    vel[1] = vel[1] - 20.0 * dt
+    let jp = keyDown(keys, "Space") > 0
+    if (jp) { if (!state.jumpHeld) { if (state.grounded) { vel[1] = 9.0; state.grounded = false } } }
+    state.jumpHeld = jp
+
+    // Integrate + ground plane at y=0.
+    pos[0] = pos[0] + vel[0] * dt
+    pos[1] = pos[1] + vel[1] * dt
+    pos[2] = pos[2] + vel[2] * dt
+    if (pos[1] <= 0) { pos[1] = 0; vel[1] = 0; state.grounded = true }
+
+    // Smooth camera target.
+    let a = 1.0 - Math.exp(0 - 10.0 * dt)
+    camTarget[0] = camTarget[0] + (pos[0] - camTarget[0]) * a
+    camTarget[1] = camTarget[1] + (pos[1] + 1.0 - camTarget[1]) * a
+    camTarget[2] = camTarget[2] + (pos[2] - camTarget[2]) * a
+
+    // Animation state: an active action plays out before locomotion resumes.
+    if (state.actionTime > 0) {
+      state.actionTime = state.actionTime - dt
+    } else {
+      if (state.grounded) {
+        if (state.moving) {
+          if (speed > 5.0) { self.setAnim(DASH) } else { self.setAnim(WALK) }
+        } else {
+          self.setAnim(IDLE)
+        }
+      }
+    }
+  }
+
+  return self
+}

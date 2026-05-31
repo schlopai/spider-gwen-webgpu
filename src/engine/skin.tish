@@ -1,0 +1,188 @@
+// engine/skin.tish — GPU skeletal skinning (ports skinning.wgsl + the original
+// Renderer's skin-compute setup). Builds the skeleton (parent + rest TRS) and
+// skin (jointNode, invBind, invMeshWorld) buffers, the 3 compute pipelines
+// (compose → hierarchy → palette) sharing one explicit bind group, and exposes
+// dispatch(enc) + copyPalette(enc, dst). The palette = invMeshWorld * world *
+// invBind is built entirely on the GPU; the CPU only uploads per-node TRS.
+
+import { mat4Create, mat4Identity, mat4Multiply, mat4Invert, mat4FromRotationTranslationScale, mat4GetScaling, mat4GetRotation } from "./math.tish"
+
+fn readVec(node, field, d0, d1, d2, d3, n) {
+  let a = js_get(node, field)
+  if (a === null) {
+    if (n === 4) { return [d0, d1, d2, d3] }
+    return [d0, d1, d2]
+  }
+  if (n === 4) { return [js_get(a,0), js_get(a,1), js_get(a,2), js_get(a,3)] }
+  return [js_get(a,0), js_get(a,1), js_get(a,2)]
+}
+
+// A node's local TRS — decomposing a `matrix` field if present (this asset uses
+// matrix nodes for the Y-up root and the 0.01 fbx scale, which TRS-only reading
+// would miss → broken skinning).
+fn nodeTRS(node) {
+  let m = js_get(node, "matrix")
+  if (m !== null) {
+    let mm = []
+    let k = 0
+    while (k < 16) { mm.push(js_get(m, k)); k = k + 1 }
+    return {
+      t: [mm[12], mm[13], mm[14]],
+      q: mat4GetRotation([0, 0, 0, 1], mm),
+      s: mat4GetScaling([0, 0, 0], mm)
+    }
+  }
+  return {
+    t: readVec(node, "translation", 0, 0, 0, 0, 3),
+    q: readVec(node, "rotation", 0, 0, 0, 1, 4),
+    s: readVec(node, "scale", 1, 1, 1, 0, 3)
+  }
+}
+
+// world = local[root] * ... * local[node], via the parent chain. TRS is the
+// flat per-node [t.xyz,0, q.xyzw, s.xyz,0] array.
+fn computeNodeWorld(nodeIdx, parent, trs, out) {
+  let chain = []
+  let cur = nodeIdx
+  while (cur >= 0) { chain.push(cur); cur = parent[cur] }
+  mat4Identity(out)
+  let local = mat4Create()
+  let i = chain.length - 1
+  while (i >= 0) {
+    let b = chain[i] * 12
+    mat4FromRotationTranslationScale(local,
+      [trs[b+4], trs[b+5], trs[b+6], trs[b+7]],
+      [trs[b+0], trs[b+1], trs[b+2]],
+      [trs[b+8], trs[b+9], trs[b+10]])
+    mat4Multiply(out, out, local)
+    i = i - 1
+  }
+  return out
+}
+
+export fn createSkin(gpu, host) {
+  let json = js_get(host, "gltf")
+  let nodes = js_get(json, "nodes")
+  let skins = js_get(json, "skins")
+  let nodeCount = js_get(nodes, "length")
+
+  // parent[] and rest TRS (flat) for every node.
+  let parent = []
+  let trs = []
+  let i = 0
+  while (i < nodeCount) { parent.push(-1); i = i + 1 }
+  i = 0
+  while (i < nodeCount) {
+    let node = js_get(nodes, i)
+    let tr = nodeTRS(node)
+    let t = tr.t
+    let q = tr.q
+    let s = tr.s
+    trs.push(t[0]); trs.push(t[1]); trs.push(t[2]); trs.push(0)
+    trs.push(q[0]); trs.push(q[1]); trs.push(q[2]); trs.push(q[3])
+    trs.push(s[0]); trs.push(s[1]); trs.push(s[2]); trs.push(0)
+    let children = js_get(node, "children")
+    if (children !== null) {
+      let cc = js_get(children, "length")
+      let c = 0
+      while (c < cc) { parent[js_get(children, c)] = i; c = c + 1 }
+    }
+    i = i + 1
+  }
+
+  // Skin 0: joints + inverse bind matrices.
+  let skinDef = js_get(skins, 0)
+  let jointsArr = js_get(skinDef, "joints")
+  let jointCount = js_get(jointsArr, "length")
+  let jointNode = []
+  i = 0
+  while (i < jointCount) { jointNode.push(js_get(jointsArr, i)); i = i + 1 }
+  let invBindH = js_call(host, "accessor", [js_get(skinDef, "inverseBindMatrices"), false])
+
+  // Mesh node world (for invMeshWorld + the rigid model matrix). Use the first
+  // node that has both a mesh and this skin.
+  let meshNodeIdx = -1
+  i = 0
+  while (i < nodeCount) {
+    let node = js_get(nodes, i)
+    if (js_get(node, "mesh") !== null) {
+      if (js_get(node, "skin") !== null) { meshNodeIdx = i; i = nodeCount }
+    }
+    i = i + 1
+  }
+  let meshWorld = mat4Create()
+  if (meshNodeIdx >= 0) { computeNodeWorld(meshNodeIdx, parent, trs, meshWorld) }
+  let invMeshWorld = mat4Invert(mat4Create(), meshWorld)
+
+  // Buffers.
+  let trsBuf = gpu.createStorage(nodeCount * 12 * 4)
+  let parentBuf = gpu.createStorage(nodeCount * 4)
+  let localBuf = gpu.createStorage(nodeCount * 64)
+  let worldBuf = gpu.createStorage(nodeCount * 64)
+  let jointNodeBuf = gpu.createStorage(jointCount * 4)
+  let invBindBuf = gpu.createStorage(jointCount * 64)
+  let paletteBuf = gpu.createStorage(jointCount * 64)
+  let paramsBuf = gpu.createUniform(80)
+
+  gpu.writeBufferF32(trsBuf, 0, trs)
+  gpu.writeBuffer(parentBuf, 0, js_call(host, "makeI32", [parent]))
+  gpu.writeBuffer(jointNodeBuf, 0, js_call(host, "makeI32", [jointNode]))
+  gpu.writeBuffer(invBindBuf, 0, invBindH)
+  gpu.writeBufferF32(paramsBuf, 0, invMeshWorld)
+  gpu.writeBuffer(paramsBuf, 64, js_call(host, "makeU32", [[nodeCount, jointCount, 0, 0]]))
+
+  // Explicit bind group layout (all 3 compute entry points share it).
+  let CO = gpu.STAGE.COMPUTE
+  let bgl = gpu.createBindGroupLayout([
+    { binding: 0, visibility: CO, buffer: { type: "read-only-storage" } },
+    { binding: 1, visibility: CO, buffer: { type: "read-only-storage" } },
+    { binding: 2, visibility: CO, buffer: { type: "storage" } },
+    { binding: 3, visibility: CO, buffer: { type: "storage" } },
+    { binding: 4, visibility: CO, buffer: { type: "read-only-storage" } },
+    { binding: 5, visibility: CO, buffer: { type: "read-only-storage" } },
+    { binding: 6, visibility: CO, buffer: { type: "storage" } },
+    { binding: 7, visibility: CO, buffer: { type: "uniform" } }
+  ])
+  let pl = gpu.createPipelineLayout([bgl])
+  let mod = gpu.shaderModule(js_get(js_get(host, "shaders"), "skinning"))
+  let composeP = gpu.computePipeline(pl, mod, "compose")
+  let hierP = gpu.computePipeline(pl, mod, "hierarchy")
+  let palP = gpu.computePipeline(pl, mod, "palette_main")
+
+  let bg = gpu.createBindGroup(bgl, [
+    { binding: 0, resource: { buffer: trsBuf } },
+    { binding: 1, resource: { buffer: parentBuf } },
+    { binding: 2, resource: { buffer: localBuf } },
+    { binding: 3, resource: { buffer: worldBuf } },
+    { binding: 4, resource: { buffer: jointNodeBuf } },
+    { binding: 5, resource: { buffer: invBindBuf } },
+    { binding: 6, resource: { buffer: paletteBuf } },
+    { binding: 7, resource: { buffer: paramsBuf } }
+  ])
+
+  let wgNodes = Math.ceil(nodeCount / 64)
+  let wgJoints = Math.ceil(jointCount / 64)
+
+  let self = {
+    nodeCount: nodeCount,
+    jointCount: jointCount,
+    parent: parent,
+    restTRS: trs,
+    model: meshWorld
+  }
+  // Upload per-node TRS (animation writes this each frame).
+  self.uploadTRS = (trsArray) => gpu.writeBufferF32(trsBuf, 0, trsArray)
+  // Run the 3 separate compute passes into `enc` (storage barriers between).
+  self.dispatch = (enc) => {
+    let p1 = gpu.beginComputePass(enc)
+    gpu.computeSetPipeline(p1, composeP); gpu.computeSetBindGroup(p1, 0, bg); gpu.computeDispatch(p1, wgNodes); gpu.computeEnd(p1)
+    let p2 = gpu.beginComputePass(enc)
+    gpu.computeSetPipeline(p2, hierP); gpu.computeSetBindGroup(p2, 0, bg); gpu.computeDispatch(p2, wgNodes); gpu.computeEnd(p2)
+    let p3 = gpu.beginComputePass(enc)
+    gpu.computeSetPipeline(p3, palP); gpu.computeSetBindGroup(p3, 0, bg); gpu.computeDispatch(p3, wgJoints); gpu.computeEnd(p3)
+  }
+  // Copy the freshly computed palette into the render-side skin uniform.
+  self.copyPalette = (enc, dst) => gpu.copyBufferToBuffer(enc, paletteBuf, 0, dst, 0, jointCount * 64)
+
+  return self
+}

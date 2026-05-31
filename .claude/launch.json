@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "spider-wasm",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/Users/a_/Projects/schlop/spider3-tish"],
+      "port": 8765
+    },
+    {
+      "name": "spider-oracle",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "/Users/a_/Projects/schlop/spider3-tish/dist/oracle"],
+      "port": 8766
+    }
+  ]
+}

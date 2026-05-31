@@ -1,0 +1,73 @@
+// engine/hud.tish — debug overlay HUD. Draws text to an OffscreenCanvas 2D
+// (via the FFI), bakes it to a texture (copyExternalImageToTexture), and draws
+// it as an alpha-blended quad with hud.wgsl, anchored top-right in NDC.
+
+export fn createHud(gpu, host) {
+  let W = 330
+  let H = 116
+  let oc = js_new("OffscreenCanvas", [W, H])
+  let ctx = js_call(oc, "getContext", ["2d"])
+  let tex = gpu.createTexture(W, H, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER)
+  let sampler = gpu.createSampler({ magFilter: "linear", minFilter: "linear" })
+
+  let mod = gpu.shaderModule(js_get(js_get(host, "shaders"), "hud"))
+  let pipeline = gpu.renderPipeline({
+    layout: "auto",
+    vertex: { module: mod, entryPoint: "vs_main" },
+    fragment: {
+      module: mod, entryPoint: "fs_main",
+      targets: [{
+        format: gpu.format,
+        blend: {
+          color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
+          alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+        }
+      }]
+    },
+    primitive: { topology: "triangle-strip" }
+  })
+
+  // NDC rect anchored top-right (rect = x0, yTop, x1, yBottom; y up).
+  let canvas = js_get(host, "canvas")
+  let cw = js_get(canvas, "width")
+  let chh = js_get(canvas, "height")
+  let ndcW = (W * 2.0) / cw
+  let ndcH = (H * 2.0) / chh
+  let x1 = 0.97
+  let x0 = x1 - ndcW
+  let yTop = 0.96
+  let yBottom = yTop - ndcH
+  let rectBuf = gpu.createUniform(16)
+  gpu.writeBufferF32(rectBuf, 0, [x0, yTop, x1, yBottom])
+
+  let bindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 0), [
+    { binding: 0, resource: { buffer: rectBuf } },
+    { binding: 1, resource: sampler },
+    { binding: 2, resource: gpu.textureView(tex) }
+  ])
+
+  let self = {}
+  self.bake = (lines) => {
+    js_call(ctx, "clearRect", [0, 0, W, H])
+    js_set(ctx, "fillStyle", "rgba(8,10,22,0.55)")
+    js_call(ctx, "fillRect", [0, 0, W, H])
+    js_set(ctx, "fillStyle", "rgba(120,90,200,0.9)")
+    js_call(ctx, "fillRect", [0, 0, W, 3])
+    js_set(ctx, "font", "15px ui-monospace, monospace")
+    js_set(ctx, "fillStyle", "#8fe6ff")
+    let y = 26
+    let i = 0
+    while (i < lines.length) {
+      js_call(ctx, "fillText", [lines[i], 14, y])
+      y = y + 21
+      i = i + 1
+    }
+    gpu.copyImageToTexture(oc, tex, W, H)
+  }
+  self.draw = (pass) => {
+    gpu.setPipeline(pass, pipeline)
+    gpu.setBindGroup(pass, 0, bindGroup)
+    gpu.draw(pass, 4)
+  }
+  return self
+}
