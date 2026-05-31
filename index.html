@@ -10,9 +10,8 @@
   #err { position: fixed; inset: 0; color: #f88; font: 14px/1.5 monospace;
          padding: 24px; white-space: pre-wrap; display: none; }
   /* Footer attribution link (ported from the original). */
-  #credit {
+  a {
     position: fixed;
-    left: 12px;
     bottom: 10px;
     z-index: 20;
     font: 11px ui-monospace, Menlo, Consolas, monospace;
@@ -22,12 +21,19 @@
     padding: 3px 8px;
     border-radius: 6px;
   }
-  #credit:hover { color: rgba(210, 240, 255, 0.95); text-decoration: underline; }
+  #credit {
+    left: 12px;
+  }
+  #made {
+    right: 12px;
+  }
+  a:hover { color: rgba(210, 240, 255, 0.95); text-decoration: underline; }
 </style>
 </head>
 <body>
 <canvas id="gpu"></canvas>
 <a id="credit" href="https://sketchfab.com/3d-models/spider-gwen-across-the-spider-verse-297c91b697f7428ea634ab454a598219" target="_blank" rel="noopener noreferrer">Spider-Gwen model by Kabiidev — Sketchfab</a>
+<a id="made" href="https://schlop.ai" target="_blank" rel="noopener noreferrer">Scene by space — schlop.ai</a>
 <pre id="err"></pre>
 
 <script type="module">
