@@ -115,17 +115,18 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     vec2<f32>(0.7, 0.7), vec2<f32>(-0.7, 0.7), vec2<f32>(0.7, -0.7), vec2<f32>(-0.7, -0.7)
   );
   for (var i = 0u; i < 8u; i = i + 1u) {
-    nearBright = nearBright + max(luma(textureSample(screenTexture, screenSampler, uv + hoff[i] * px * 7.0).rgb) - 0.70, 0.0);
+    nearBright = nearBright + max(luma(textureSample(screenTexture, screenSampler, uv + hoff[i] * px * 9.0).rgb) - 0.60, 0.0);
   }
-  nearBright = clamp(nearBright, 0.0, 1.0);
+  nearBright = clamp(nearBright * 1.3, 0.0, 1.0);
 
-  // Dotted halo: bright dots where the pixel is itself dim but borders bright.
-  let ownDim = 1.0 - smoothstep(0.45, 0.75, lum0);
-  ldr = ldr + vec3<f32>(dotFill * nearBright * ownDim * 0.7);
+  // Dotted halo: bright dots where the pixel is itself dim but borders bright —
+  // a glowing dotted ring hugging the character's lit silhouette.
+  let ownDim = 1.0 - smoothstep(0.45, 0.78, lum0);
+  ldr = ldr + vec3<f32>(dotFill * nearBright * ownDim * 1.05);
 
   // Faint dotted comic shading through the midtones (clean at flat black/white).
   let shade = 1.0 - smoothstep(0.25, 0.6, abs(lum0 - 0.42) * 2.2);
-  ldr = ldr * (1.0 - dotFill * shade * 0.2);
+  ldr = ldr * (1.0 - dotFill * shade * 0.12);
 
   // Vignette.
   let vig = 1.0 - smoothstep(0.45, 0.9, dist);

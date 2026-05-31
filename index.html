@@ -9,10 +9,25 @@
   #gpu { width: 100vw; height: 100vh; display: block; }
   #err { position: fixed; inset: 0; color: #f88; font: 14px/1.5 monospace;
          padding: 24px; white-space: pre-wrap; display: none; }
+  /* Footer attribution link (ported from the original). */
+  #credit {
+    position: fixed;
+    left: 12px;
+    bottom: 10px;
+    z-index: 20;
+    font: 11px ui-monospace, Menlo, Consolas, monospace;
+    color: rgba(200, 220, 255, 0.6);
+    text-decoration: none;
+    background: rgba(8, 10, 20, 0.45);
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+  #credit:hover { color: rgba(210, 240, 255, 0.95); text-decoration: underline; }
 </style>
 </head>
 <body>
 <canvas id="gpu"></canvas>
+<a id="credit" href="https://sketchfab.com/3d-models/spider-gwen-across-the-spider-verse-297c91b697f7428ea634ab454a598219" target="_blank" rel="noopener noreferrer">Spider-Gwen model by Kabiidev — Sketchfab</a>
 <pre id="err"></pre>
 
 <script type="module">
