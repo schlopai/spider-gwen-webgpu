@@ -1,41 +1,80 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>spider3-tish</title>
-<style>
-  html, body { margin: 0; height: 100%; background: #0b0b12; overflow: hidden; }
-  #gpu { width: 100vw; height: 100vh; display: block; }
-  #err { position: fixed; inset: 0; color: #f88; font: 14px/1.5 monospace;
-         padding: 24px; white-space: pre-wrap; display: none; }
-  /* Footer attribution link (ported from the original). */
-  a {
-    position: fixed;
-    bottom: 10px;
-    z-index: 20;
-    font: 11px ui-monospace, Menlo, Consolas, monospace;
-    color: rgba(200, 220, 255, 0.6);
-    text-decoration: none;
-    background: rgba(8, 10, 20, 0.45);
-    padding: 3px 8px;
-    border-radius: 6px;
-  }
-  #credit {
-    left: 12px;
-  }
-  #made {
-    right: 12px;
-  }
-  a:hover { color: rgba(210, 240, 255, 0.95); text-decoration: underline; }
-</style>
-</head>
-<body>
-<canvas id="gpu"></canvas>
-<a id="credit" href="https://sketchfab.com/3d-models/spider-gwen-across-the-spider-verse-297c91b697f7428ea634ab454a598219" target="_blank" rel="noopener noreferrer">Spider-Gwen model by Kabiidev — Sketchfab</a>
-<a id="made" href="https://schlop.ai" target="_blank" rel="noopener noreferrer">Scene by space — schlop.ai</a>
-<pre id="err"></pre>
 
-<script type="module" src="/src/boot.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Spider-Gwen wasm + WebGPU Demo</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      background: #0b0b12;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #gpu {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    #err {
+      position: fixed;
+      inset: 0;
+      color: #f88;
+      font: 14px/1.5 monospace;
+      padding: 24px;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    /* Footer attribution link (ported from the original). */
+    a {
+      font: 11px ui-monospace, Menlo, Consolas, monospace;
+      color: rgba(200, 220, 255, 0.6);
+      text-decoration: none;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    #footer {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      font: 11px ui-monospace, Menlo, Consolas, monospace;
+      color: rgba(200, 220, 255, 0.6);
+      text-decoration: none;
+      background: rgba(8, 10, 20, 0.45);
+      padding: 8px 8px;
+      border-radius: 6px;
+    }
+
+    a:hover {
+      color: rgba(210, 240, 255, 0.95);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="gpu"></canvas>
+  <div id="footer">
+    <a id="credit"
+      href="https://sketchfab.com/3d-models/spider-gwen-across-the-spider-verse-297c91b697f7428ea634ab454a598219"
+      target="_blank" rel="noopener noreferrer">Spider-Gwen model by Kabiidev</a>
+    -
+    <a id="made" href="https://github.com/schlopai/spider-gwen-webgpu" target="_blank" rel="noopener noreferrer">Demo by
+      space</a>
+  </div>
+  <pre id="err"></pre>
+
+  <script type="module" src="/src/boot.js"></script>
 </body>
+
 </html>

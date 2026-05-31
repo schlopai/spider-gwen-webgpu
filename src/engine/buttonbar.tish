@@ -68,7 +68,7 @@ export fn createButtonBar(gpu, host) {
   let scale = drawW / W
   let drawH = H * scale
   let x0 = (cw - drawW) / 2
-  let y1 = chh - margin
+  let y1 = chh - margin - (chh * 0.15)
   let y0 = y1 - drawH
 
   let rectBuf = gpu.createUniform(16)
@@ -105,7 +105,7 @@ export fn createButtonBar(gpu, host) {
     js_set(ctx, "textAlign", "center")
     js_set(ctx, "font", "10px ui-monospace, monospace")
     js_set(ctx, "fillStyle", "rgba(150,210,255,0.7)")
-    js_call(ctx, "fillText", ["Drag: look   Wheel: zoom   Click: move", W / 2, 11])
+    js_call(ctx, "fillText", ["Shift: run   Drag: look   Wheel: zoom   Click: move", W / 2, 11])
     let bi = 0
     while (bi < rects.length) {
       let r = rects[bi]

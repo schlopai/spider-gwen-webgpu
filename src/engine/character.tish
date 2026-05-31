@@ -128,7 +128,11 @@ export fn createController(host, animator, clips) {
       moveZ = moveZ / len
       vel[0] = moveX * speed
       vel[2] = moveZ * speed
-      state.facing = Math.atan2(moveX, moveZ)
+      let targetFacing = Math.atan2(moveX, moveZ)
+      let diff = targetFacing - state.facing
+      if (diff < (0 - 3.14159265)) { diff = diff + 6.28318531 }
+      if (diff > 3.14159265) { diff = diff - 6.28318531 }
+      state.facing = state.facing + diff * (1.0 - Math.exp(0 - 15.0 * dt))
       state.moving = true
     } else {
       if (state.navActive) {
@@ -139,7 +143,11 @@ export fn createController(host, animator, clips) {
           let s = 4.0 / d
           vel[0] = dx * s
           vel[2] = dz * s
-          state.facing = Math.atan2(dx, dz)
+          let targetFacing = Math.atan2(dx, dz)
+          let diff = targetFacing - state.facing
+          if (diff < (0 - 3.14159265)) { diff = diff + 6.28318531 }
+          if (diff > 3.14159265) { diff = diff - 6.28318531 }
+          state.facing = state.facing + diff * (1.0 - Math.exp(0 - 15.0 * dt))
           state.moving = true
         } else {
           state.navActive = false

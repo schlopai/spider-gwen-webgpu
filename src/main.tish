@@ -52,6 +52,10 @@ let animator = createAnimator(skin.restTRS, skin.nodeCount)
 animator.setClips(clips)
 let controller = createController(host, animator, clips)
 let input = js_get(host, "input")
+let gltfJson = js_get(host, "gltf")
+let gltfMeshes = js_get(gltfJson, "meshes")
+let meshCount = 0
+if (gltfMeshes !== null) { meshCount = js_get(gltfMeshes, "length") }
 let clock = { last: 0 - 1 }
 
 // Deterministic LCG (matches the original `seed = (seed*1664525+1013904223)>>>0`;
@@ -362,10 +366,8 @@ fn frame(ts) {
   if (dt > 0.0005) { hudState.fps = hudState.fps * 0.92 + (1.0 / dt) * 0.08 }
   if ((hudState.frames % 12) === 0) {
     hud.bake([
-      "spider3-tish  -  wasm + WebGPU",
       "FPS " + Math.round(hudState.fps),
-      "pos " + Math.round(controller.pos[0]) + " " + Math.round(controller.pos[1]) + " " + Math.round(controller.pos[2]),
-      "joints " + skin.jointCount + "   draws " + (statics.length + prims.length)
+      "meshes " + meshCount + "   joints " + skin.jointCount + "   draws " + (statics.length + prims.length)
     ])
   }
   // On-screen button bar: re-bake when state changes (throttled), draw every frame.
@@ -394,5 +396,4 @@ fn frame(ts) {
   js_set(win, "__cz", controller.pos[2])
 }
 
-console.log("spider3-tish M6: character controller")
 request_animation_frame(frame)

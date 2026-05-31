@@ -1,8 +1,6 @@
-# spider3-tish
+# Spider-Gwen - Across the Spider-Verse WebGPU demo
 
-The **spider3** WebGPU engine, ported to [tish](https://tishlang.com): written in tish,
-compiled to a bytecode chunk, run on a prebuilt wasm VM, rendering through browser
-**WebGPU**. An interactive, GPU-skinned, animated Spider-Gwen running through a neon
+Written in tish, compiled to a bytecode chunk, run on a prebuilt wasm VM, rendering through browser **WebGPU**. An interactive, GPU-skinned, animated Spider-Gwen running through a neon
 Spider-Verse city — glTF loading, GPU skeletal skinning, keyframe animation, a character
 controller, post-processing (bloom / depth-of-field / ACES), and a HUD, all in tish.
 Bundled with **Vite**.
@@ -25,6 +23,9 @@ Bundled with **Vite**.
 
 ```bash
 npm install
+npm run build:runtime
+npm run build:assets
+npm run build
 npm run dev          # builds the model on first run, then serves with HMR
 ```
 

@@ -1,4 +1,4 @@
-// Host boot loader for spider3-tish. Bundled by Vite. Bootstraps WebGPU, loads the
+// Host boot loader bundled by Vite. Bootstraps WebGPU, loads the
 // model + shaders, instantiates the prebuilt tish wasm VM, and hands it an `env`
 // object; the engine itself is tish bytecode (gen/chunk.bin) run by the VM.
 //
@@ -120,6 +120,9 @@ async function main() {
   window.__input = input;
   let _dnX = 0, _dnY = 0, _dnT = 0, _moved = false;
   const _btnPointers = new Map();
+  const _camPointers = new Map();
+  let _lastPinchDist = null;
+
   // Hit-test the tish-exposed on-screen button rects (NDC); returns a key code.
   const hitButton = (clientX, clientY) => {
     const btns = window.__buttons;
@@ -139,43 +142,73 @@ async function main() {
     const code = hitButton(e.clientX, e.clientY);
     if (code) {
       input.keys[code] = true; _btnPointers.set(e.pointerId, code);
-      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
       return; // a button press is not a look-drag or a move-to
     }
-    input.dragging = true; _dnX = e.clientX; _dnY = e.clientY; _dnT = performance.now(); _moved = false;
-  });
-  addEventListener('pointermove', (e) => {
-    if (input.dragging) {
-      input.lookDx += e.movementX; input.lookDy += e.movementY;
-      if (Math.abs(e.clientX - _dnX) > 6 || Math.abs(e.clientY - _dnY) > 6) _moved = true;
+    _camPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (_camPointers.size === 1) {
+      input.dragging = true; _dnX = e.clientX; _dnY = e.clientY; _dnT = performance.now(); _moved = false;
+    } else if (_camPointers.size === 2) {
+      input.dragging = false; // pause rotation while zooming
+      const pts = Array.from(_camPointers.values());
+      _lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     }
   });
-  addEventListener('pointerup', (e) => {
+  addEventListener('pointermove', (e) => {
+    if (_camPointers.has(e.pointerId)) {
+      _camPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (_camPointers.size === 2) {
+        const pts = Array.from(_camPointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (_lastPinchDist !== null) {
+          input.wheel += (_lastPinchDist - dist) * 1.5;
+        }
+        _lastPinchDist = dist;
+      } else if (input.dragging && _camPointers.size === 1) {
+        input.lookDx += e.movementX; input.lookDy += e.movementY;
+        if (Math.abs(e.clientX - _dnX) > 6 || Math.abs(e.clientY - _dnY) > 6) _moved = true;
+      }
+    }
+  });
+  const onPointerUp = (e) => {
     if (_btnPointers.has(e.pointerId)) {
       input.keys[_btnPointers.get(e.pointerId)] = false; _btnPointers.delete(e.pointerId);
       return;
     }
-    input.dragging = false;
-    // A quick, stationary click/tap = move-to (unprojected to the ground in tish).
-    if (!_moved && (performance.now() - _dnT) < 350) {
-      const r = canvas.getBoundingClientRect();
-      input.tapNx = ((e.clientX - r.left) / r.width) * 2 - 1;
-      input.tapNy = 1 - ((e.clientY - r.top) / r.height) * 2;
-      input.tapReady = true;
+    if (_camPointers.has(e.pointerId)) {
+      _camPointers.delete(e.pointerId);
+      if (_camPointers.size < 2) _lastPinchDist = null;
+      if (_camPointers.size === 0) {
+        input.dragging = false;
+        // A quick, stationary click/tap = move-to (unprojected to the ground in tish).
+        if (!_moved && (performance.now() - _dnT) < 350) {
+          const r = canvas.getBoundingClientRect();
+          input.tapNx = ((e.clientX - r.left) / r.width) * 2 - 1;
+          input.tapNy = 1 - ((e.clientY - r.top) / r.height) * 2;
+          input.tapReady = true;
+        }
+      } else if (_camPointers.size === 1) {
+        input.dragging = true;
+        _moved = true; // prevent tap firing after pinch completes
+      }
     }
-  });
+  };
+  addEventListener('pointerup', onPointerUp);
+  addEventListener('pointercancel', onPointerUp);
   canvas.addEventListener('wheel', (e) => { input.wheel += e.deltaY; e.preventDefault(); }, { passive: false });
 
   if (!navigator.gpu) return fail('WebGPU not supported in this browser.');
-  const adapter = await navigator.gpu.requestAdapter();
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adapter) return fail('No WebGPU adapter.');
   const device = await adapter.requestDevice();
   const context = canvas.getContext('webgpu');
   const format = navigator.gpu.getPreferredCanvasFormat();
   // COPY_SRC lets us read back the swapchain for deterministic verification
   // (screenshots are unreliable when the preview tab is throttled/offscreen).
-  context.configure({ device, format, alphaMode: 'opaque',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+  context.configure({
+    device, format, alphaMode: 'opaque',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
+  });
 
   window.__gpuError = null;
   device.addEventListener('uncapturederror', (e) => {
