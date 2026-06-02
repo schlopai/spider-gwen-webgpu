@@ -23,7 +23,7 @@ wasm-bindgen --target web --no-typescript \
 echo "wasm-opt -Oz ..."
 before=$(wc -c < "$ROOT/vendor/tish_vm_bg.wasm")
 # reference-types + bulk-memory are emitted by wasm-bindgen; wasm-opt must allow them.
-npx wasm-opt -Oz --enable-reference-types --enable-bulk-memory \
+npx --no-install wasm-opt -Oz --enable-reference-types --enable-bulk-memory \
   "$ROOT/vendor/tish_vm_bg.wasm" -o "$ROOT/vendor/tish_vm_bg.wasm"
 after=$(wc -c < "$ROOT/vendor/tish_vm_bg.wasm")
 

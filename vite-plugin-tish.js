@@ -3,12 +3,25 @@
 // In dev it watches src/**/*.tish and full-reloads on change (the wasm VM holds all
 // engine state, so there is nothing to hot-swap — a fresh chunk needs a fresh VM).
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const TISH = process.env.TISH || path.join(process.env.HOME, '.cargo/bin/tish');
+
+let TISH = process.env.TISH;
+if (!TISH) {
+  const localNpm = path.join(ROOT, 'node_modules/.bin/tish');
+  const localCargo = path.join(process.env.HOME, '.cargo/bin/tish');
+  if (existsSync(localNpm)) {
+    TISH = localNpm;
+  } else if (existsSync(localCargo)) {
+    TISH = localCargo;
+  } else {
+    TISH = 'tish';
+  }
+}
+
 const WORKSPACE = process.env.TISHLANG_WORKSPACE || path.join(process.env.HOME, 'Projects/tish/tish');
 const ENTRY = path.join(ROOT, 'src/main.tish');
 const OUT = path.join(ROOT, 'gen/chunk.bin');
