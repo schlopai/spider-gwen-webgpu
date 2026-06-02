@@ -7,6 +7,7 @@ import tish from './vite-plugin-tish.js';
 // runtime wasm / bytecode chunk / model as content-hashed assets — replacing the old
 // ?v=Date.now() cache-busting and the ~20 separate runtime fetches.
 export default defineConfig({
+  base: '/spider-gwen-webgpu/',
   server: {
     host: true,
   },
