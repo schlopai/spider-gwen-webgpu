@@ -10,14 +10,14 @@ export fn createBox(gpu, host) {
 
   // Each face: [normal, u-axis, v-axis].
   let faces = [
-    [[1,0,0],  [0,0,-1], [0,1,0]],
-    [[-1,0,0], [0,0,1],  [0,1,0]],
-    [[0,1,0],  [1,0,0],  [0,0,1]],
-    [[0,-1,0], [1,0,0],  [0,0,-1]],
-    [[0,0,1],  [1,0,0],  [0,1,0]],
-    [[0,0,-1], [-1,0,0], [0,1,0]]
+    [[1, 0, 0], [0, 0, -1], [0, 1, 0]],
+    [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+    [[0, 1, 0], [1, 0, 0], [0, 0, 1]],
+    [[0, -1, 0], [1, 0, 0], [0, 0, -1]],
+    [[0, 0, 1], [1, 0, 0], [0, 1, 0]],
+    [[0, 0, -1], [-1, 0, 0], [0, 1, 0]]
   ]
-  let corners = [[-1,-1], [1,-1], [1,1], [-1,1]]
+  let corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]]
 
   let fi = 0
   while (fi < 6) {
@@ -29,15 +29,22 @@ export fn createBox(gpu, host) {
     let ci = 0
     while (ci < 4) {
       let cc = corners[ci]
-      positions.push(nrm[0]*0.5 + ua[0]*0.5*cc[0] + va[0]*0.5*cc[1])
-      positions.push(nrm[1]*0.5 + ua[1]*0.5*cc[0] + va[1]*0.5*cc[1])
-      positions.push(nrm[2]*0.5 + ua[2]*0.5*cc[0] + va[2]*0.5*cc[1])
-      normals.push(nrm[0]); normals.push(nrm[1]); normals.push(nrm[2])
-      uvs.push((cc[0] + 1) / 2); uvs.push((cc[1] + 1) / 2)
+      positions.push(nrm[0] * 0.5 + ua[0] * 0.5 * cc[0] + va[0] * 0.5 * cc[1])
+      positions.push(nrm[1] * 0.5 + ua[1] * 0.5 * cc[0] + va[1] * 0.5 * cc[1])
+      positions.push(nrm[2] * 0.5 + ua[2] * 0.5 * cc[0] + va[2] * 0.5 * cc[1])
+      normals.push(nrm[0])
+      normals.push(nrm[1])
+      normals.push(nrm[2])
+      uvs.push((cc[0] + 1) / 2)
+      uvs.push((cc[1] + 1) / 2)
       ci = ci + 1
     }
-    indices.push(base); indices.push(base + 1); indices.push(base + 2)
-    indices.push(base); indices.push(base + 2); indices.push(base + 3)
+    indices.push(base)
+    indices.push(base + 1)
+    indices.push(base + 2)
+    indices.push(base)
+    indices.push(base + 2)
+    indices.push(base + 3)
     fi = fi + 1
   }
 
@@ -58,7 +65,13 @@ export fn createBox(gpu, host) {
   gpu.writeBufferU16(indexBuf, 0, indices)
 
   return {
-    posBuf: posBuf, uvBuf: uvBuf, normBuf: normBuf, jointsBuf: jointsBuf, weightsBuf: weightsBuf,
-    indexBuf: indexBuf, indexCount: indices.length, indexFormat: "uint16"
+    posBuf: posBuf,
+    uvBuf: uvBuf,
+    normBuf: normBuf,
+    jointsBuf: jointsBuf,
+    weightsBuf: weightsBuf,
+    indexBuf: indexBuf,
+    indexCount: indices.length,
+    indexFormat: "uint16"
   }
 }

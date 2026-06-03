@@ -43,21 +43,38 @@ export fn createGpu(host) {
 
   // Resources
   g.createBuffer = (size, usage) => js_call(device, "createBuffer", [{ size: size, usage: usage }])
-  g.writeBuffer = (buf, offset, typedHandle) => js_call(queue, "writeBuffer", [buf, offset, typedHandle])
+  g.writeBuffer = (buf, offset, typedHandle) => js_call(queue, "writeBuffer", [
+    buf,
+    offset,
+    typedHandle
+  ])
   g.writeBufferF32 = (buf, offset, arr) => js_call(queue, "writeBuffer", [buf, offset, f32a(arr)])
   g.writeBufferU16 = (buf, offset, arr) => js_call(queue, "writeBuffer", [buf, offset, u16a(arr)])
   g.shaderModule = (code) => js_call(device, "createShaderModule", [{ code: code }])
   g.renderPipeline = (desc) => js_call(device, "createRenderPipeline", [desc])
 
   // Textures / samplers / bind groups
-  g.createTexture = (w, h, fmt, usage) => js_call(device, "createTexture", [{ size: [w, h], format: fmt, usage: usage }])
+  g.createTexture = (w, h, fmt, usage) => js_call(device, "createTexture", [
+    { size: [w, h], format: fmt, usage: usage }
+  ])
   g.textureView = (tex) => js_call(tex, "createView", [])
   g.textureViewDesc = (tex, desc) => js_call(tex, "createView", [desc])
   g.createSampler = (desc) => js_call(device, "createSampler", [desc])
-  g.copyImageToTexture = (img, tex, w, h) => js_call(queue, "copyExternalImageToTexture", [{ source: img }, { texture: tex }, [w, h]])
-  g.writeTexture = (tex, u8handle, bytesPerRow, w, h) => js_call(queue, "writeTexture", [{ texture: tex }, u8handle, { bytesPerRow: bytesPerRow }, [w, h]])
+  g.copyImageToTexture = (img, tex, w, h) => js_call(queue, "copyExternalImageToTexture", [
+    { source: img },
+    { texture: tex },
+    [w, h]
+  ])
+  g.writeTexture = (tex, u8handle, bytesPerRow, w, h) => js_call(queue, "writeTexture", [
+    { texture: tex },
+    u8handle,
+    { bytesPerRow: bytesPerRow },
+    [w, h]
+  ])
   g.bindGroupLayout = (pipeline, index) => js_call(pipeline, "getBindGroupLayout", [index])
-  g.createBindGroup = (layout, entries) => js_call(device, "createBindGroup", [{ layout: layout, entries: entries }])
+  g.createBindGroup = (layout, entries) => js_call(device, "createBindGroup", [
+    { layout: layout, entries: entries }
+  ])
   g.setBindGroup = (pass, index, bg) => js_call(pass, "setBindGroup", [index, bg])
 
   // Frame / commands
@@ -66,22 +83,29 @@ export fn createGpu(host) {
   g.submit = (enc) => js_call(queue, "submit", [[js_call(enc, "finish", [])]])
 
   // Uniform buffer (UNIFORM | COPY_DST)
-  g.createUniform = (size) => js_call(device, "createBuffer", [{ size: size, usage: g.BUFFER.UNIFORM | g.BUFFER.COPY_DST }])
+  g.createUniform = (size) => js_call(device, "createBuffer", [
+    { size: size, usage: g.BUFFER.UNIFORM | g.BUFFER.COPY_DST }
+  ])
 
   // Render pass
-  g.beginColorPass = (enc, view, clear) => js_call(enc, "beginRenderPass", [{
-    colorAttachments: [{ view: view, loadOp: "clear", storeOp: "store", clearValue: clear }]
-  }])
+  g.beginColorPass = (enc, view, clear) => js_call(enc, "beginRenderPass", [
+    { colorAttachments: [{ view: view, loadOp: "clear", storeOp: "store", clearValue: clear }] }
+  ])
   // Load (don't clear) — for overlays drawn on top of the final image.
-  g.beginColorPassLoad = (enc, view) => js_call(enc, "beginRenderPass", [{
-    colorAttachments: [{ view: view, loadOp: "load", storeOp: "store" }]
-  }])
-  g.beginColorDepthPass = (enc, view, depthView, clear) => js_call(enc, "beginRenderPass", [{
-    colorAttachments: [{ view: view, loadOp: "clear", storeOp: "store", clearValue: clear }],
-    depthStencilAttachment: {
-      view: depthView, depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store"
+  g.beginColorPassLoad = (enc, view) => js_call(enc, "beginRenderPass", [
+    { colorAttachments: [{ view: view, loadOp: "load", storeOp: "store" }] }
+  ])
+  g.beginColorDepthPass = (enc, view, depthView, clear) => js_call(enc, "beginRenderPass", [
+    {
+      colorAttachments: [{ view: view, loadOp: "clear", storeOp: "store", clearValue: clear }],
+      depthStencilAttachment: {
+        view: depthView,
+        depthClearValue: 1,
+        depthLoadOp: "clear",
+        depthStoreOp: "store"
+      }
     }
-  }])
+  ])
   g.setPipeline = (pass, p) => js_call(pass, "setPipeline", [p])
   g.setVertexBuffer = (pass, slot, buf) => js_call(pass, "setVertexBuffer", [slot, buf])
   g.setIndexBuffer = (pass, buf, fmt) => js_call(pass, "setIndexBuffer", [buf, fmt])
@@ -91,17 +115,31 @@ export fn createGpu(host) {
 
   // Explicit layouts + compute (needed when multiple compute entry points share
   // one bind group — layout:auto would give each entry its own incompatible layout).
-  g.createBindGroupLayout = (entries) => js_call(device, "createBindGroupLayout", [{ entries: entries }])
-  g.createPipelineLayout = (layouts) => js_call(device, "createPipelineLayout", [{ bindGroupLayouts: layouts }])
-  g.computePipeline = (layout, module, entryPoint) => js_call(device, "createComputePipeline", [{ layout: layout, compute: { module: module, entryPoint: entryPoint } }])
-  g.createStorage = (size) => js_call(device, "createBuffer", [{ size: size, usage: g.BUFFER.STORAGE | g.BUFFER.COPY_DST | g.BUFFER.COPY_SRC }])
+  g.createBindGroupLayout = (entries) => js_call(device, "createBindGroupLayout", [
+    { entries: entries }
+  ])
+  g.createPipelineLayout = (layouts) => js_call(device, "createPipelineLayout", [
+    { bindGroupLayouts: layouts }
+  ])
+  g.computePipeline = (layout, module, entryPoint) => js_call(device, "createComputePipeline", [
+    { layout: layout, compute: { module: module, entryPoint: entryPoint } }
+  ])
+  g.createStorage = (size) => js_call(device, "createBuffer", [
+    { size: size, usage: g.BUFFER.STORAGE | g.BUFFER.COPY_DST | g.BUFFER.COPY_SRC }
+  ])
 
   g.beginComputePass = (enc) => js_call(enc, "beginComputePass", [])
   g.computeSetPipeline = (pass, p) => js_call(pass, "setPipeline", [p])
   g.computeSetBindGroup = (pass, idx, bg) => js_call(pass, "setBindGroup", [idx, bg])
   g.computeDispatch = (pass, x) => js_call(pass, "dispatchWorkgroups", [x])
   g.computeEnd = (pass) => js_call(pass, "end", [])
-  g.copyBufferToBuffer = (enc, src, srcOff, dst, dstOff, size) => js_call(enc, "copyBufferToBuffer", [src, srcOff, dst, dstOff, size])
+  g.copyBufferToBuffer = (enc, src, srcOff, dst, dstOff, size) => js_call(enc, "copyBufferToBuffer", [
+    src,
+    srcOff,
+    dst,
+    dstOff,
+    size
+  ])
 
   return g
 }

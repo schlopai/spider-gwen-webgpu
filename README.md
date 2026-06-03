@@ -9,8 +9,8 @@ Bundled with **Vite**.
 
 ## Prerequisites
 
-- A **Chromium-based browser** (WebGPU).
-- **Node** ≥ 18 + npm.
+- A **WebGPU** compatible browser.
+- **Node** ≥ 20 + npm.
 - The **`tish` CLI** on your `PATH` (`~/.cargo/bin/tish`) — compiles the engine to a
   bytecode chunk (`--target bytecode`). Override with `TISH=…` / `TISHLANG_WORKSPACE=…`.
 - For **`build:runtime` only**: a **Rust toolchain** with the `wasm32-unknown-unknown`
@@ -31,7 +31,7 @@ npm run build
 npm run dev          # builds the model on first run, then serves with HMR
 ```
 
-Open the printed `http://localhost:…` URL in a Chromium-based browser. Editing a `.tish`
+Open the printed `http://localhost:…` URL in the browser. Editing a `.tish`
 file recompiles the chunk and reloads; editing `boot.js` / shaders hot-reloads via Vite.
 
 ```bash

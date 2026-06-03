@@ -10,20 +10,38 @@
 // is the unmasked face + hair (hood down). Tag each so H shows one at a time and
 // the default (hoodUp=true) is the iconic hood-up.
 fn meshHood(name) {
-  if (name === null) { return "none" }
+  if (name === null) {
+    return "none"
+  }
   let lower = name.toLowerCase()
-  if (lower.indexOf("wait head") >= 0) { return "up" }
-  if (lower.indexOf("idle head") >= 0) { return "down" }
+  if (lower.indexOf("wait head") >= 0) {
+    return "up"
+  }
+  if (lower.indexOf("idle head") >= 0) {
+    return "down"
+  }
   return "none"
 }
 
 fn unionBounds(b, mn, mx) {
-  if (mn[0] < b.min[0]) { b.min[0] = mn[0] }
-  if (mn[1] < b.min[1]) { b.min[1] = mn[1] }
-  if (mn[2] < b.min[2]) { b.min[2] = mn[2] }
-  if (mx[0] > b.max[0]) { b.max[0] = mx[0] }
-  if (mx[1] > b.max[1]) { b.max[1] = mx[1] }
-  if (mx[2] > b.max[2]) { b.max[2] = mx[2] }
+  if (mn[0] < b.min[0]) {
+    b.min[0] = mn[0]
+  }
+  if (mn[1] < b.min[1]) {
+    b.min[1] = mn[1]
+  }
+  if (mn[2] < b.min[2]) {
+    b.min[2] = mn[2]
+  }
+  if (mx[0] > b.max[0]) {
+    b.max[0] = mx[0]
+  }
+  if (mx[1] > b.max[1]) {
+    b.max[1] = mx[1]
+  }
+  if (mx[2] > b.max[2]) {
+    b.max[2] = mx[2]
+  }
 }
 
 // Build one vertex-attribute buffer. If the attribute is absent, upload a
@@ -34,7 +52,11 @@ fn makeAttr(gpu, host, attrs, name, asU16, zeroLen, zeroIsU16, usage) {
   if (idx !== null) {
     h = js_call(host, "accessor", [idx, asU16])
   } else {
-    if (zeroIsU16) { h = js_call(host, "zerosU16", [zeroLen]) } else { h = js_call(host, "zerosF32", [zeroLen]) }
+    if (zeroIsU16) {
+      h = js_call(host, "zerosU16", [zeroLen])
+    } else {
+      h = js_call(host, "zerosF32", [zeroLen])
+    }
   }
   let buf = gpu.createBuffer(js_get(h, "byteLength"), usage)
   gpu.writeBuffer(buf, 0, h)
@@ -73,7 +95,12 @@ export fn loadScene(gpu, host, materialLayout) {
       let sz = js_call(host, "imageSize", [ii])
       let w = js_get(sz, 0)
       let h = js_get(sz, 1)
-      let tex = gpu.createTexture(w, h, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER)
+      let tex = gpu.createTexture(
+        w,
+        h,
+        "rgba8unorm",
+        gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER
+      )
       gpu.copyImageToTexture(img, tex, w, h)
       textures.push(tex)
       ii = ii + 1
@@ -94,20 +121,24 @@ export fn loadScene(gpu, host, materialLayout) {
         if (bct !== null) {
           let gtex = js_get(jsonTextures, js_get(bct, "index"))
           let src = js_get(gtex, "source")
-          if (src !== null) { tex = textures[src] }
+          if (src !== null) {
+            tex = textures[src]
+          }
         }
       }
-      materials.push(gpu.createBindGroup(materialLayout, [
-        { binding: 0, resource: defaultSampler },
-        { binding: 1, resource: gpu.textureView(tex) }
-      ]))
+      materials.push(
+        gpu.createBindGroup(materialLayout, [
+          { binding: 0, resource: defaultSampler },
+          { binding: 1, resource: gpu.textureView(tex) }
+        ])
+      )
       mi = mi + 1
     }
   }
 
   let prims = []
-  let big = 1000000000.0
-  let bounds = { min: [big, big, big], max: [0.0 - big, 0.0 - big, 0.0 - big] }
+  let big = 1000000000
+  let bounds = { min: [big, big, big], max: [0 - big, 0 - big, 0 - big] }
 
   let i = 0
   while (i < nodeCount) {
@@ -133,7 +164,11 @@ export fn loadScene(gpu, host, materialLayout) {
           let mn = js_get(acc, "min")
           let mx = js_get(acc, "max")
           if (mn !== null) {
-            unionBounds(bounds, [js_get(mn,0), js_get(mn,1), js_get(mn,2)], [js_get(mx,0), js_get(mx,1), js_get(mx,2)])
+            unionBounds(
+              bounds,
+              [js_get(mn, 0), js_get(mn, 1), js_get(mn, 2)],
+              [js_get(mx, 0), js_get(mx, 1), js_get(mx, 2)]
+            )
           }
 
           let uvBuf = makeAttr(gpu, host, attrs, "TEXCOORD_0", false, vcount * 2, false, VB)
@@ -151,17 +186,29 @@ export fn loadScene(gpu, host, materialLayout) {
             indexBuf = gpu.createBuffer(js_get(idxH, "byteLength"), IB)
             gpu.writeBuffer(indexBuf, 0, idxH)
             let iacc = js_get(accessors, indicesIdx)
-            if (js_get(iacc, "componentType") === 5125) { indexFormat = "uint32" }
+            if (js_get(iacc, "componentType") === 5125) {
+              indexFormat = "uint32"
+            }
           }
 
           let matBG = defaultMaterial
           let matIdx = js_get(prim, "material")
-          if (matIdx !== null) { matBG = materials[matIdx] }
+          if (matIdx !== null) {
+            matBG = materials[matIdx]
+          }
 
           prims.push({
-            posBuf: posBuf, uvBuf: uvBuf, normBuf: normBuf, jointsBuf: jointsBuf, weightsBuf: weightsBuf,
-            indexBuf: indexBuf, indexCount: indexCount, indexFormat: indexFormat,
-            vertexCount: vcount, material: matBG, hood: hood
+            posBuf: posBuf,
+            uvBuf: uvBuf,
+            normBuf: normBuf,
+            jointsBuf: jointsBuf,
+            weightsBuf: weightsBuf,
+            indexBuf: indexBuf,
+            indexCount: indexCount,
+            indexFormat: indexFormat,
+            vertexCount: vcount,
+            material: matBG,
+            hood: hood
           })
         }
         p = p + 1

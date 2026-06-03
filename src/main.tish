@@ -10,12 +10,24 @@ import { createController } from "./engine/character.tish"
 import { createBox } from "./engine/primitives.tish"
 import { createHud } from "./engine/hud.tish"
 import { createButtonBar } from "./engine/buttonbar.tish"
-import { mat4Create, mat4Multiply, mat4PerspectiveZO, mat4LookAt, mat4FromRotationTranslationScale, mat4Invert, vec4TransformMat4 } from "./engine/math.tish"
+import {
+  mat4Create,
+  mat4Multiply,
+  mat4PerspectiveZO,
+  mat4LookAt,
+  mat4FromRotationTranslationScale,
+  mat4Invert,
+  vec4TransformMat4
+} from "./engine/math.tish"
 
 // A primitive is visible unless it's the hidden head variant (hood up/down).
 fn primVisible(pr, hoodUp) {
-  if (pr.hood === "up") { return hoodUp }
-  if (pr.hood === "down") { return !hoodUp }
+  if (pr.hood === "up") {
+    return hoodUp
+  }
+  if (pr.hood === "down") {
+    return !hoodUp
+  }
   return true
 }
 
@@ -29,12 +41,13 @@ let mainModule = gpu.shaderModule(js_get(shaders, "main"))
 let pipeline = gpu.renderPipeline({
   layout: "auto",
   vertex: {
-    module: mainModule, entryPoint: "vs_main",
+    module: mainModule,
+    entryPoint: "vs_main",
     buffers: [
       { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
-      { arrayStride: 8,  attributes: [{ shaderLocation: 1, offset: 0, format: "float32x2" }] },
+      { arrayStride: 8, attributes: [{ shaderLocation: 1, offset: 0, format: "float32x2" }] },
       { arrayStride: 12, attributes: [{ shaderLocation: 2, offset: 0, format: "float32x3" }] },
-      { arrayStride: 8,  attributes: [{ shaderLocation: 3, offset: 0, format: "uint16x4" }] },
+      { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: "uint16x4" }] },
       { arrayStride: 16, attributes: [{ shaderLocation: 4, offset: 0, format: "float32x4" }] }
     ]
   },
@@ -55,7 +68,9 @@ let input = js_get(host, "input")
 let gltfJson = js_get(host, "gltf")
 let gltfMeshes = js_get(gltfJson, "meshes")
 let meshCount = 0
-if (gltfMeshes !== null) { meshCount = js_get(gltfMeshes, "length") }
+if (gltfMeshes !== null) {
+  meshCount = js_get(gltfMeshes, "length")
+}
 let clock = { last: 0 - 1 }
 
 // Deterministic LCG (matches the original `seed = (seed*1664525+1013904223)>>>0`;
@@ -64,7 +79,12 @@ fn nextRnd(rng) {
   rng.seed = (rng.seed * 1664525 + 1013904223) % 4294967296
   return rng.seed / 4294967295
 }
-fn absf(x) { if (x < 0) { return 0 - x } return x }
+fn absf(x) {
+  if (x < 0) {
+    return 0 - x
+  }
+  return x
+}
 
 // Environment: shared box mesh; each static object gets its own albedo material
 // (1x1 texture) + model uniform (transform + emissive). Static boxes upload zero
@@ -74,14 +94,25 @@ let boxSampler = gpu.createSampler({ magFilter: "linear", minFilter: "linear" })
 let statics = []
 fn addStatic(px, py, pz, sx, sy, sz, ar, ag, ab, er, eg, eb) {
   let tex = gpu.createTexture(1, 1, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST)
-  gpu.writeTexture(tex, u8a([Math.round(ar * 255), Math.round(ag * 255), Math.round(ab * 255), 255]), 4, 1, 1)
-  let material = gpu.createBindGroup(materialLayout, [{ binding: 0, resource: boxSampler }, { binding: 1, resource: gpu.textureView(tex) }])
+  gpu.writeTexture(
+    tex,
+    u8a([Math.round(ar * 255), Math.round(ag * 255), Math.round(ab * 255), 255]),
+    4,
+    1,
+    1
+  )
+  let material = gpu.createBindGroup(materialLayout, [
+    { binding: 0, resource: boxSampler },
+    { binding: 1, resource: gpu.textureView(tex) }
+  ])
   let m = mat4Create()
   mat4FromRotationTranslationScale(m, [0, 0, 0, 1], [px, py, pz], [sx, sy, sz])
   let buf = gpu.createUniform(80)
   gpu.writeBufferF32(buf, 0, m)
   gpu.writeBufferF32(buf, 64, [er, eg, eb, 0])
-  let model = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 3), [{ binding: 0, resource: { buffer: buf } }])
+  let model = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 3), [
+    { binding: 0, resource: { buffer: buf } }
+  ])
   statics.push({ material: material, model: model })
 }
 
@@ -91,11 +122,17 @@ addStatic(0, 0 - 0.5, 0, 200, 1, 200, 0.03, 0.03, 0.05, 0, 0, 0)
 // Neon skyline: 6x6 grid of glowing towers of varying height around a central
 // plaza. 8-colour palette; dark albedo (c*0.16) + neon emissive (c*0.90).
 let palette = [
-  [1.0, 0.12, 0.70], [0.10, 0.90, 1.0], [1.0, 0.18, 0.22], [1.0, 0.55, 0.12],
-  [0.25, 1.0, 0.45], [0.60, 0.20, 1.0], [0.20, 0.45, 1.0], [1.0, 0.40, 0.72]
+  [1, 0.12, 0.7],
+  [0.1, 0.9, 1],
+  [1, 0.18, 0.22],
+  [1, 0.55, 0.12],
+  [0.25, 1, 0.45],
+  [0.6, 0.2, 1],
+  [0.2, 0.45, 1],
+  [1, 0.4, 0.72]
 ]
 let rng = { seed: 1337 }
-let CELL = 11.0
+let CELL = 11
 let ci = 0
 let gx = 0
 while (gx < 6) {
@@ -104,16 +141,33 @@ while (gx < 6) {
     let cx = (gx - 2.5) * CELL
     let cz = (gz - 2.5) * CELL
     let inPlaza = false
-    if (absf(cx) < CELL) { if (absf(cz) < CELL) { inPlaza = true } }
+    if (absf(cx) < CELL) {
+      if (absf(cz) < CELL) {
+        inPlaza = true
+      }
+    }
     if (!inPlaza) {
-      let w = 4.0 + nextRnd(rng) * 3.5
-      let d = 4.0 + nextRnd(rng) * 3.5
-      let h = 7.0 + nextRnd(rng) * 34.0
-      let x = cx + (nextRnd(rng) - 0.5) * 3.0
-      let z = cz + (nextRnd(rng) - 0.5) * 3.0
+      let w = 4 + nextRnd(rng) * 3.5
+      let d = 4 + nextRnd(rng) * 3.5
+      let h = 7 + nextRnd(rng) * 34
+      let x = cx + (nextRnd(rng) - 0.5) * 3
+      let z = cz + (nextRnd(rng) - 0.5) * 3
       let c = palette[ci % 8]
       ci = ci + 1
-      addStatic(x, h / 2, z, w, h, d, c[0]*0.16, c[1]*0.16, c[2]*0.16, c[0]*0.90, c[1]*0.90, c[2]*0.90)
+      addStatic(
+        x,
+        h / 2,
+        z,
+        w,
+        h,
+        d,
+        c[0] * 0.16,
+        c[1] * 0.16,
+        c[2] * 0.16,
+        c[0] * 0.9,
+        c[1] * 0.9,
+        c[2] * 0.9
+      )
     }
     gz = gz + 1
   }
@@ -121,32 +175,50 @@ while (gx < 6) {
 }
 let hud = createHud(gpu, host)
 let buttonBar = createButtonBar(gpu, host)
-let hudState = { fps: 60.0, frames: 0 }
+let hudState = { fps: 60, frames: 0 }
 console.log("M8 char-prims:", prims.length, "statics:", statics.length)
 
 let aspect = js_get(canvas, "width") / js_get(canvas, "height")
 
 // Camera (group0): viewProj + camPos, rewritten each frame.
 let camBuf = gpu.createUniform(80)
-let camBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 0), [{ binding: 0, resource: { buffer: camBuf } }])
+let camBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 0), [
+  { binding: 0, resource: { buffer: camBuf } }
+])
 
 // Skin uniform (group2): identity init; GPU palette overwrites it each frame.
-let palette = []
+let identity = []
 let ji = 0
 while (ji < 128) {
-  palette.push(1); palette.push(0); palette.push(0); palette.push(0)
-  palette.push(0); palette.push(1); palette.push(0); palette.push(0)
-  palette.push(0); palette.push(0); palette.push(1); palette.push(0)
-  palette.push(0); palette.push(0); palette.push(0); palette.push(1)
+  identity.push(1)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(1)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(1)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(0)
+  identity.push(1)
   ji = ji + 1
 }
 let skinUniformBuf = gpu.createUniform(8192)
-gpu.writeBufferF32(skinUniformBuf, 0, palette)
-let skinBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 2), [{ binding: 0, resource: { buffer: skinUniformBuf } }])
+gpu.writeBufferF32(skinUniformBuf, 0, identity)
+let skinBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 2), [
+  { binding: 0, resource: { buffer: skinUniformBuf } }
+])
 
 // Model (group3): charTransform * meshWorld, rewritten each frame.
 let modelBuf = gpu.createUniform(80)
-let modelBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 3), [{ binding: 0, resource: { buffer: modelBuf } }])
+let modelBindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 3), [
+  { binding: 0, resource: { buffer: modelBuf } }
+])
 
 let cw = js_get(canvas, "width")
 let ch = js_get(canvas, "height")
@@ -177,36 +249,44 @@ let shadowModule = gpu.shaderModule(js_get(shaders, "shadow"))
 let shadowPipeline = gpu.renderPipeline({
   layout: "auto",
   vertex: {
-    module: shadowModule, entryPoint: "vs_main",
+    module: shadowModule,
+    entryPoint: "vs_main",
     buffers: [
       { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
-      { arrayStride: 8,  attributes: [{ shaderLocation: 1, offset: 0, format: "float32x2" }] },
+      { arrayStride: 8, attributes: [{ shaderLocation: 1, offset: 0, format: "float32x2" }] },
       { arrayStride: 12, attributes: [{ shaderLocation: 2, offset: 0, format: "float32x3" }] },
-      { arrayStride: 8,  attributes: [{ shaderLocation: 3, offset: 0, format: "uint16x4" }] },
+      { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: "uint16x4" }] },
       { arrayStride: 16, attributes: [{ shaderLocation: 4, offset: 0, format: "float32x4" }] }
     ]
   },
-  fragment: { module: shadowModule, entryPoint: "fs_main", targets: [{
-    format: "rgba16float",
-    blend: {
-      color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-      alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
-    }
-  }] },
+  fragment: {
+    module: shadowModule,
+    entryPoint: "fs_main",
+    targets: [
+      {
+        format: "rgba16float",
+        blend: {
+          color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
+          alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+        }
+      }
+    ]
+  },
   primitive: { topology: "triangle-list", cullMode: "none" },
   depthStencil: { format: "depth24plus", depthWriteEnabled: false, depthCompare: "less-equal" }
 })
 let shadowModelBuf = gpu.createUniform(80)
-let shadowCamBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 0), [{ binding: 0, resource: { buffer: camBuf } }])
-let shadowSkinBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 2), [{ binding: 0, resource: { buffer: skinUniformBuf } }])
-let shadowModelBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 3), [{ binding: 0, resource: { buffer: shadowModelBuf } }])
+let shadowCamBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 0), [
+  { binding: 0, resource: { buffer: camBuf } }
+])
+let shadowSkinBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 2), [
+  { binding: 0, resource: { buffer: skinUniformBuf } }
+])
+let shadowModelBG = gpu.createBindGroup(gpu.bindGroupLayout(shadowPipeline, 3), [
+  { binding: 0, resource: { buffer: shadowModelBuf } }
+])
 // Project onto plane y=0.02 along key light L=(0.6,0.9,0.4): -Lx/Ly, -Lz/Ly.
-let shadowMat = [
-  1, 0, 0, 0,
-  0 - 0.667, 0, 0 - 0.444, 0,
-  0, 0, 1, 0,
-  0.0133, 0.02, 0.0089, 1
-]
+let shadowMat = [1, 0, 0, 0, 0 - 0.667, 0, 0 - 0.444, 0, 0, 0, 1, 0, 0.0133, 0.02, 0.0089, 1]
 let shadowModel16 = mat4Create()
 
 // Per-frame matrix scratch (written by the mat4 module fns; main's frame closure
@@ -224,17 +304,28 @@ let ZERO4 = [0, 0, 0, 0]
 
 fn frame(ts) {
   let dt = 0
-  if (clock.last >= 0) { dt = (ts - clock.last) / 1000 }
+  if (clock.last >= 0) {
+    dt = (ts - clock.last) / 1000
+  }
   clock.last = ts
-  if (dt > 0.1) { dt = 0.1 }
-  if (dt < 0) { dt = 0 }
+  if (dt > 0.1) {
+    dt = 0.1
+  }
+  if (dt < 0) {
+    dt = 0
+  }
 
   controller.update(dt)
   skin.uploadTRS(animator.update(dt))
 
   // Model matrix = translate/rotateY(char) * meshWorld.
   let f = controller.state.facing
-  mat4FromRotationTranslationScale(charXform, [0, Math.sin(f / 2), 0, Math.cos(f / 2)], controller.pos, ONE3)
+  mat4FromRotationTranslationScale(
+    charXform,
+    [0, Math.sin(f / 2), 0, Math.cos(f / 2)],
+    controller.pos,
+    ONE3
+  )
   mat4Multiply(model16, charXform, skin.model)
   gpu.writeBufferF32(modelBuf, 0, model16)
   gpu.writeBufferF32(modelBuf, 64, ZERO4)
@@ -255,7 +346,7 @@ fn frame(ts) {
   let ez = e[2]
   // near/far MUST match post.wgsl's depth linearization (0.1 / 1000) so the DoF
   // focus plane lands on the character (focusDist = cam.dist) at any zoom.
-  mat4PerspectiveZO(proj, 0.85, aspect, 0.1, 1000.0)
+  mat4PerspectiveZO(proj, 0.85, aspect, 0.1, 1000)
   mat4LookAt(view, [ex, ey, ez], [tx, ty, tz], [0, 1, 0])
   mat4Multiply(viewProj, proj, view)
   gpu.writeBufferF32(camBuf, 0, viewProj)
@@ -284,7 +375,7 @@ fn frame(ts) {
   skin.dispatch(enc)
   skin.copyPalette(enc, skinUniformBuf)
 
-  let pass = gpu.beginColorDepthPass(enc, hdrView, depthView, { r: 0.01, g: 0.01, b: 0.03, a: 1.0 })
+  let pass = gpu.beginColorDepthPass(enc, hdrView, depthView, { r: 0.01, g: 0.01, b: 0.03, a: 1 })
   gpu.setPipeline(pass, pipeline)
   gpu.setBindGroup(pass, 0, camBindGroup)
   gpu.setBindGroup(pass, 2, skinBindGroup)
@@ -363,23 +454,28 @@ fn frame(ts) {
 
   // HUD overlay (bake throttled; drawn over the final image).
   hudState.frames = hudState.frames + 1
-  if (dt > 0.0005) { hudState.fps = hudState.fps * 0.92 + (1.0 / dt) * 0.08 }
-  if ((hudState.frames % 12) === 0) {
+  if (dt > 0.0005) {
+    hudState.fps = hudState.fps * 0.92 + 1 / dt * 0.08
+  }
+  if (hudState.frames % 12 === 0) {
     hud.bake([
       "FPS " + Math.round(hudState.fps),
       "meshes " + meshCount + "   joints " + skin.jointCount + "   draws " + (statics.length + prims.length)
     ])
   }
   // On-screen button bar: re-bake when state changes (throttled), draw every frame.
-  if ((hudState.frames % 4) === 0) {
+  if (hudState.frames % 4 === 0) {
     let bkeys = js_get(input, "keys")
     let bactive = []
     let bdefs = buttonBar.defs
     let bdi = 0
     while (bdi < bdefs.length) {
       let bc = bdefs[bdi].code
-      if (bc === "KeyH") { bactive.push(controller.state.hoodUp) }
-      else { bactive.push(js_get(bkeys, bc) === true) }
+      if (bc === "KeyH") {
+        bactive.push(controller.state.hoodUp)
+      } else {
+        bactive.push(js_get(bkeys, bc) === true)
+      }
       bdi = bdi + 1
     }
     buttonBar.bake(bactive)

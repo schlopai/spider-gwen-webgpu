@@ -13,7 +13,10 @@ fn toNums(h) {
   let n = js_get(h, "length")
   let a = []
   let i = 0
-  while (i < n) { a.push(js_get(h, i)); i = i + 1 }
+  while (i < n) {
+    a.push(js_get(h, i))
+    i = i + 1
+  }
   return a
 }
 
@@ -21,7 +24,9 @@ export fn loadAnimations(host) {
   let json = js_get(host, "gltf")
   let anims = js_get(json, "animations")
   let clips = []
-  if (anims === null) { return clips }
+  if (anims === null) {
+    return clips
+  }
   let ac = js_get(anims, "length")
   let i = 0
   while (i < ac) {
@@ -40,12 +45,22 @@ export fn loadAnimations(host) {
       let times = toNums(js_call(host, "accessor", [js_get(samp, "input"), false]))
       let values = toNums(js_call(host, "accessor", [js_get(samp, "output"), false]))
       let stride = 3
-      if (path === "rotation") { stride = 4 }
+      if (path === "rotation") {
+        stride = 4
+      }
       if (times.length > 0) {
         let last = times[times.length - 1]
-        if (last > duration) { duration = last }
+        if (last > duration) {
+          duration = last
+        }
       }
-      clipChannels.push({ node: js_get(target, "node"), path: path, times: times, values: values, stride: stride })
+      clipChannels.push({
+        node: js_get(target, "node"),
+        path: path,
+        times: times,
+        values: values,
+        stride: stride
+      })
       c = c + 1
     }
     clips.push({ name: js_get(animDef, "name"), duration: duration, channels: clipChannels })
@@ -63,7 +78,9 @@ export fn createAnimator(restTRS, nodeCount) {
   let prevBuf = []
   let i = 0
   while (i < restTRS.length) {
-    trs.push(restTRS[i]); curBuf.push(restTRS[i]); prevBuf.push(restTRS[i])
+    trs.push(restTRS[i])
+    curBuf.push(restTRS[i])
+    prevBuf.push(restTRS[i])
     i = i + 1
   }
   let tmp = [0, 0, 0, 0]
@@ -74,48 +91,80 @@ export fn createAnimator(restTRS, nodeCount) {
     let values = ch.values
     let stride = ch.stride
     let n = times.length
-    if (n === 0) { return out }
+    if (n === 0) {
+      return out
+    }
     if (t <= times[0]) {
       let k = 0
-      while (k < stride) { out[k] = values[k]; k = k + 1 }
+      while (k < stride) {
+        out[k] = values[k]
+        k = k + 1
+      }
       return out
     }
     if (t >= times[n - 1]) {
       let base = (n - 1) * stride
       let k = 0
-      while (k < stride) { out[k] = values[base + k]; k = k + 1 }
+      while (k < stride) {
+        out[k] = values[base + k]
+        k = k + 1
+      }
       return out
     }
     let idx = 0
     let j = 0
     while (j < n - 1) {
       if (t >= times[j]) {
-        if (t < times[j + 1]) { idx = j; j = n } else { j = j + 1 }
-      } else { j = j + 1 }
+        if (t < times[j + 1]) {
+          idx = j
+          j = n
+        } else {
+          j = j + 1
+        }
+      } else {
+        j = j + 1
+      }
     }
     let span = times[idx + 1] - times[idx]
     let alpha = 0
-    if (span > 0) { alpha = (t - times[idx]) / span }
+    if (span > 0) {
+      alpha = (t - times[idx]) / span
+    }
     let ai = idx * stride
     let bi = (idx + 1) * stride
     if (stride === 4) {
-      let ax = values[ai]; let ay = values[ai+1]; let az = values[ai+2]; let aw = values[ai+3]
-      let bx = values[bi]; let by = values[bi+1]; let bz = values[bi+2]; let bw = values[bi+3]
-      let cosom = ax*bx + ay*by + az*bz + aw*bw
-      if (cosom < 0) { cosom = 0-cosom; bx = 0-bx; by = 0-by; bz = 0-bz; bw = 0-bw }
+      let ax = values[ai]
+      let ay = values[ai + 1]
+      let az = values[ai + 2]
+      let aw = values[ai + 3]
+      let bx = values[bi]
+      let by = values[bi + 1]
+      let bz = values[bi + 2]
+      let bw = values[bi + 3]
+      let cosom = ax * bx + ay * by + az * bz + aw * bw
+      if (cosom < 0) {
+        cosom = 0 - cosom
+        bx = 0 - bx
+        by = 0 - by
+        bz = 0 - bz
+        bw = 0 - bw
+      }
       let s0 = 1 - alpha
       let s1 = alpha
-      if ((1 - cosom) > 0.000001) {
+      if (1 - cosom > 0.000001) {
         let omega = Math.acos(cosom)
         let sinom = Math.sin(omega)
         s0 = Math.sin((1 - alpha) * omega) / sinom
         s1 = Math.sin(alpha * omega) / sinom
       }
-      out[0] = s0*ax + s1*bx; out[1] = s0*ay + s1*by; out[2] = s0*az + s1*bz; out[3] = s0*aw + s1*bw
+      out[0] = s0 * ax + s1 * bx
+      out[1] = s0 * ay + s1 * by
+      out[2] = s0 * az + s1 * bz
+      out[3] = s0 * aw + s1 * bw
     } else {
-      out[0] = values[ai]   + alpha * (values[bi]   - values[ai])
-      out[1] = values[ai+1] + alpha * (values[bi+1] - values[ai+1])
-      out[2] = values[ai+2] + alpha * (values[bi+2] - values[ai+2])
+      out[0] = values[ai] + alpha * (values[bi] - values[ai])
+      out[1] = values[ai + 1] + alpha * (values[bi + 1] - values[ai + 1])
+      out[2] = values[ai + 2] + alpha * (values[bi + 2] - values[ai + 2])
     }
     return out
   }
@@ -123,7 +172,10 @@ export fn createAnimator(restTRS, nodeCount) {
   // Overlay a clip's animated channels onto the rest pose, into `out`.
   fn sampleClipInto(clip, time, out) {
     let k = 0
-    while (k < restTRS.length) { out[k] = restTRS[k]; k = k + 1 }
+    while (k < restTRS.length) {
+      out[k] = restTRS[k]
+      k = k + 1
+    }
     let cc = clip.channels.length
     let c = 0
     while (c < cc) {
@@ -131,12 +183,19 @@ export fn createAnimator(restTRS, nodeCount) {
       sampleChannel(ch, time, tmp)
       let b = ch.node * 12
       if (ch.path === "translation") {
-        out[b] = tmp[0]; out[b+1] = tmp[1]; out[b+2] = tmp[2]
+        out[b] = tmp[0]
+        out[b + 1] = tmp[1]
+        out[b + 2] = tmp[2]
       } else {
         if (ch.path === "rotation") {
-          out[b+4] = tmp[0]; out[b+5] = tmp[1]; out[b+6] = tmp[2]; out[b+7] = tmp[3]
+          out[b + 4] = tmp[0]
+          out[b + 5] = tmp[1]
+          out[b + 6] = tmp[2]
+          out[b + 7] = tmp[3]
         } else {
-          out[b+8] = tmp[0]; out[b+9] = tmp[1]; out[b+10] = tmp[2]
+          out[b + 8] = tmp[0]
+          out[b + 9] = tmp[1]
+          out[b + 10] = tmp[2]
         }
       }
       c = c + 1
@@ -148,34 +207,58 @@ export fn createAnimator(restTRS, nodeCount) {
     let ni = 0
     while (ni < nodeCount) {
       let o = ni * 12
-      out[o]   = a[o]   + (b[o]   - a[o])   * w
-      out[o+1] = a[o+1] + (b[o+1] - a[o+1]) * w
-      out[o+2] = a[o+2] + (b[o+2] - a[o+2]) * w
-      let ax = a[o+4]; let ay = a[o+5]; let az = a[o+6]; let aw = a[o+7]
-      let bx = b[o+4]; let by = b[o+5]; let bz = b[o+6]; let bw = b[o+7]
-      let cosom = ax*bx + ay*by + az*bz + aw*bw
-      if (cosom < 0) { cosom = 0-cosom; bx = 0-bx; by = 0-by; bz = 0-bz; bw = 0-bw }
+      out[o] = a[o] + (b[o] - a[o]) * w
+      out[o + 1] = a[o + 1] + (b[o + 1] - a[o + 1]) * w
+      out[o + 2] = a[o + 2] + (b[o + 2] - a[o + 2]) * w
+      let ax = a[o + 4]
+      let ay = a[o + 5]
+      let az = a[o + 6]
+      let aw = a[o + 7]
+      let bx = b[o + 4]
+      let by = b[o + 5]
+      let bz = b[o + 6]
+      let bw = b[o + 7]
+      let cosom = ax * bx + ay * by + az * bz + aw * bw
+      if (cosom < 0) {
+        cosom = 0 - cosom
+        bx = 0 - bx
+        by = 0 - by
+        bz = 0 - bz
+        bw = 0 - bw
+      }
       let s0 = 1 - w
       let s1 = w
-      if ((1 - cosom) > 0.000001) {
+      if (1 - cosom > 0.000001) {
         let omega = Math.acos(cosom)
         let sinom = Math.sin(omega)
         s0 = Math.sin((1 - w) * omega) / sinom
         s1 = Math.sin(w * omega) / sinom
       }
-      out[o+4] = s0*ax + s1*bx
-      out[o+5] = s0*ay + s1*by
-      out[o+6] = s0*az + s1*bz
-      out[o+7] = s0*aw + s1*bw
-      out[o+8]  = a[o+8]  + (b[o+8]  - a[o+8])  * w
-      out[o+9]  = a[o+9]  + (b[o+9]  - a[o+9])  * w
-      out[o+10] = a[o+10] + (b[o+10] - a[o+10]) * w
+      out[o + 4] = s0 * ax + s1 * bx
+      out[o + 5] = s0 * ay + s1 * by
+      out[o + 6] = s0 * az + s1 * bz
+      out[o + 7] = s0 * aw + s1 * bw
+      out[o + 8] = a[o + 8] + (b[o + 8] - a[o + 8]) * w
+      out[o + 9] = a[o + 9] + (b[o + 9] - a[o + 9]) * w
+      out[o + 10] = a[o + 10] + (b[o + 10] - a[o + 10]) * w
       ni = ni + 1
     }
   }
 
-  let self = { clips: [], current: 0 - 1, previous: 0 - 1, time: 0, prevTime: 0, fade: 1.0, fadeDur: 0.32, loop: true, trs: trs }
-  self.setClips = (c) => { self.clips = c }
+  let self = {
+    clips: [],
+    current: 0 - 1,
+    previous: 0 - 1,
+    time: 0,
+    prevTime: 0,
+    fade: 1,
+    fadeDur: 0.32,
+    loop: true,
+    trs: trs
+  }
+  self.setClips = (c) => {
+    self.clips = c
+  }
   self.play = (idx, loop) => {
     if (self.current !== idx) {
       self.previous = self.current
@@ -188,35 +271,48 @@ export fn createAnimator(restTRS, nodeCount) {
   }
 
   self.update = (dt) => {
-    if (self.current < 0) { return trs }
+    if (self.current < 0) {
+      return trs
+    }
     let clip = self.clips[self.current]
     self.time = self.time + dt
     if (self.loop) {
       if (clip.duration > 0) {
-        while (self.time >= clip.duration) { self.time = self.time - clip.duration }
-        while (self.time < 0) { self.time = self.time + clip.duration }
+        while (self.time >= clip.duration) {
+          self.time = self.time - clip.duration
+        }
+        while (self.time < 0) {
+          self.time = self.time + clip.duration
+        }
       }
     }
     sampleClipInto(clip, self.time, curBuf)
 
     // Crossfade from the outgoing clip's held pose into the current one.
     if (self.previous >= 0) {
-      if (self.fade < 1.0) {
+      if (self.fade < 1) {
         self.fade = self.fade + dt / self.fadeDur
-        if (self.fade > 1.0) { self.fade = 1.0 }
+        if (self.fade > 1) {
+          self.fade = 1
+        }
         sampleClipInto(self.clips[self.previous], self.prevTime, prevBuf)
         // Smoothstep ease so the crossfade eases in/out (no linear pop at the
         // ends) — much smoother than blending on the raw linear weight.
-        let w = self.fade * self.fade * (3.0 - 2.0 * self.fade)
+        let w = self.fade * self.fade * (3 - 2 * self.fade)
         blendInto(trs, prevBuf, curBuf, w)
-        if (self.fade >= 1.0) { self.previous = 0 - 1 }
+        if (self.fade >= 1) {
+          self.previous = 0 - 1
+        }
         return trs
       }
       self.previous = 0 - 1
     }
 
     let k = 0
-    while (k < restTRS.length) { trs[k] = curBuf[k]; k = k + 1 }
+    while (k < restTRS.length) {
+      trs[k] = curBuf[k]
+      k = k + 1
+    }
     return trs
   }
 

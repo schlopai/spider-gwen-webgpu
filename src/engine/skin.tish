@@ -5,16 +5,28 @@
 // dispatch(enc) + copyPalette(enc, dst). The palette = invMeshWorld * world *
 // invBind is built entirely on the GPU; the CPU only uploads per-node TRS.
 
-import { mat4Create, mat4Identity, mat4Multiply, mat4Invert, mat4FromRotationTranslationScale, mat4GetScaling, mat4GetRotation } from "./math.tish"
+import {
+  mat4Create,
+  mat4Identity,
+  mat4Multiply,
+  mat4Invert,
+  mat4FromRotationTranslationScale,
+  mat4GetScaling,
+  mat4GetRotation
+} from "./math.tish"
 
 fn readVec(node, field, d0, d1, d2, d3, n) {
   let a = js_get(node, field)
   if (a === null) {
-    if (n === 4) { return [d0, d1, d2, d3] }
+    if (n === 4) {
+      return [d0, d1, d2, d3]
+    }
     return [d0, d1, d2]
   }
-  if (n === 4) { return [js_get(a,0), js_get(a,1), js_get(a,2), js_get(a,3)] }
-  return [js_get(a,0), js_get(a,1), js_get(a,2)]
+  if (n === 4) {
+    return [js_get(a, 0), js_get(a, 1), js_get(a, 2), js_get(a, 3)]
+  }
+  return [js_get(a, 0), js_get(a, 1), js_get(a, 2)]
 }
 
 // A node's local TRS — decomposing a `matrix` field if present (this asset uses
@@ -25,7 +37,10 @@ fn nodeTRS(node) {
   if (m !== null) {
     let mm = []
     let k = 0
-    while (k < 16) { mm.push(js_get(m, k)); k = k + 1 }
+    while (k < 16) {
+      mm.push(js_get(m, k))
+      k = k + 1
+    }
     return {
       t: [mm[12], mm[13], mm[14]],
       q: mat4GetRotation([0, 0, 0, 1], mm),
@@ -44,16 +59,21 @@ fn nodeTRS(node) {
 fn computeNodeWorld(nodeIdx, parent, trs, out) {
   let chain = []
   let cur = nodeIdx
-  while (cur >= 0) { chain.push(cur); cur = parent[cur] }
+  while (cur >= 0) {
+    chain.push(cur)
+    cur = parent[cur]
+  }
   mat4Identity(out)
   let local = mat4Create()
   let i = chain.length - 1
   while (i >= 0) {
     let b = chain[i] * 12
-    mat4FromRotationTranslationScale(local,
-      [trs[b+4], trs[b+5], trs[b+6], trs[b+7]],
-      [trs[b+0], trs[b+1], trs[b+2]],
-      [trs[b+8], trs[b+9], trs[b+10]])
+    mat4FromRotationTranslationScale(
+      local,
+      [trs[b + 4], trs[b + 5], trs[b + 6], trs[b + 7]],
+      [trs[b + 0], trs[b + 1], trs[b + 2]],
+      [trs[b + 8], trs[b + 9], trs[b + 10]]
+    )
     mat4Multiply(out, out, local)
     i = i - 1
   }
@@ -70,7 +90,10 @@ export fn createSkin(gpu, host) {
   let parent = []
   let trs = []
   let i = 0
-  while (i < nodeCount) { parent.push(-1); i = i + 1 }
+  while (i < nodeCount) {
+    parent.push(-1)
+    i = i + 1
+  }
   i = 0
   while (i < nodeCount) {
     let node = js_get(nodes, i)
@@ -78,14 +101,26 @@ export fn createSkin(gpu, host) {
     let t = tr.t
     let q = tr.q
     let s = tr.s
-    trs.push(t[0]); trs.push(t[1]); trs.push(t[2]); trs.push(0)
-    trs.push(q[0]); trs.push(q[1]); trs.push(q[2]); trs.push(q[3])
-    trs.push(s[0]); trs.push(s[1]); trs.push(s[2]); trs.push(0)
+    trs.push(t[0])
+    trs.push(t[1])
+    trs.push(t[2])
+    trs.push(0)
+    trs.push(q[0])
+    trs.push(q[1])
+    trs.push(q[2])
+    trs.push(q[3])
+    trs.push(s[0])
+    trs.push(s[1])
+    trs.push(s[2])
+    trs.push(0)
     let children = js_get(node, "children")
     if (children !== null) {
       let cc = js_get(children, "length")
       let c = 0
-      while (c < cc) { parent[js_get(children, c)] = i; c = c + 1 }
+      while (c < cc) {
+        parent[js_get(children, c)] = i
+        c = c + 1
+      }
     }
     i = i + 1
   }
@@ -96,7 +131,10 @@ export fn createSkin(gpu, host) {
   let jointCount = js_get(jointsArr, "length")
   let jointNode = []
   i = 0
-  while (i < jointCount) { jointNode.push(js_get(jointsArr, i)); i = i + 1 }
+  while (i < jointCount) {
+    jointNode.push(js_get(jointsArr, i))
+    i = i + 1
+  }
   let invBindH = js_call(host, "accessor", [js_get(skinDef, "inverseBindMatrices"), false])
 
   // Mesh node world (for invMeshWorld + the rigid model matrix). Use the first
@@ -106,12 +144,17 @@ export fn createSkin(gpu, host) {
   while (i < nodeCount) {
     let node = js_get(nodes, i)
     if (js_get(node, "mesh") !== null) {
-      if (js_get(node, "skin") !== null) { meshNodeIdx = i; i = nodeCount }
+      if (js_get(node, "skin") !== null) {
+        meshNodeIdx = i
+        i = nodeCount
+      }
     }
     i = i + 1
   }
   let meshWorld = mat4Create()
-  if (meshNodeIdx >= 0) { computeNodeWorld(meshNodeIdx, parent, trs, meshWorld) }
+  if (meshNodeIdx >= 0) {
+    computeNodeWorld(meshNodeIdx, parent, trs, meshWorld)
+  }
   let invMeshWorld = mat4Invert(mat4Create(), meshWorld)
 
   // Buffers.
@@ -175,14 +218,30 @@ export fn createSkin(gpu, host) {
   // Run the 3 separate compute passes into `enc` (storage barriers between).
   self.dispatch = (enc) => {
     let p1 = gpu.beginComputePass(enc)
-    gpu.computeSetPipeline(p1, composeP); gpu.computeSetBindGroup(p1, 0, bg); gpu.computeDispatch(p1, wgNodes); gpu.computeEnd(p1)
+    gpu.computeSetPipeline(p1, composeP)
+    gpu.computeSetBindGroup(p1, 0, bg)
+    gpu.computeDispatch(p1, wgNodes)
+    gpu.computeEnd(p1)
     let p2 = gpu.beginComputePass(enc)
-    gpu.computeSetPipeline(p2, hierP); gpu.computeSetBindGroup(p2, 0, bg); gpu.computeDispatch(p2, wgNodes); gpu.computeEnd(p2)
+    gpu.computeSetPipeline(p2, hierP)
+    gpu.computeSetBindGroup(p2, 0, bg)
+    gpu.computeDispatch(p2, wgNodes)
+    gpu.computeEnd(p2)
     let p3 = gpu.beginComputePass(enc)
-    gpu.computeSetPipeline(p3, palP); gpu.computeSetBindGroup(p3, 0, bg); gpu.computeDispatch(p3, wgJoints); gpu.computeEnd(p3)
+    gpu.computeSetPipeline(p3, palP)
+    gpu.computeSetBindGroup(p3, 0, bg)
+    gpu.computeDispatch(p3, wgJoints)
+    gpu.computeEnd(p3)
   }
   // Copy the freshly computed palette into the render-side skin uniform.
-  self.copyPalette = (enc, dst) => gpu.copyBufferToBuffer(enc, paletteBuf, 0, dst, 0, jointCount * 64)
+  self.copyPalette = (enc, dst) => gpu.copyBufferToBuffer(
+    enc,
+    paletteBuf,
+    0,
+    dst,
+    0,
+    jointCount * 64
+  )
 
   return self
 }

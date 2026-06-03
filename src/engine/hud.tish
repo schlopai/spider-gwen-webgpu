@@ -7,7 +7,12 @@ export fn createHud(gpu, host) {
   let H = 60
   let oc = js_new("OffscreenCanvas", [W, H])
   let ctx = js_call(oc, "getContext", ["2d"])
-  let tex = gpu.createTexture(W, H, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER)
+  let tex = gpu.createTexture(
+    W,
+    H,
+    "rgba8unorm",
+    gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER
+  )
   let sampler = gpu.createSampler({ magFilter: "linear", minFilter: "linear" })
 
   let mod = gpu.shaderModule(js_get(js_get(host, "shaders"), "hud"))
@@ -15,14 +20,17 @@ export fn createHud(gpu, host) {
     layout: "auto",
     vertex: { module: mod, entryPoint: "vs_main" },
     fragment: {
-      module: mod, entryPoint: "fs_main",
-      targets: [{
-        format: gpu.format,
-        blend: {
-          color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-          alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+      module: mod,
+      entryPoint: "fs_main",
+      targets: [
+        {
+          format: gpu.format,
+          blend: {
+            color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
+            alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+          }
         }
-      }]
+      ]
     },
     primitive: { topology: "triangle-strip" }
   })
@@ -31,11 +39,11 @@ export fn createHud(gpu, host) {
   let canvas = js_get(host, "canvas")
   let cw = js_get(canvas, "width")
   let chh = js_get(canvas, "height")
-  let ndcW = (W * 2.0) / cw
-  let ndcH = (H * 2.0) / chh
-  let x0 = 0.0 - ndcW / 2.0
-  let x1 = ndcW / 2.0
-  let yBottom = 0.0 - 0.78
+  let ndcW = W * 2 / cw
+  let ndcH = H * 2 / chh
+  let x0 = 0 - ndcW / 2
+  let x1 = ndcW / 2
+  let yBottom = 0 - 0.78
   let yTop = yBottom + ndcH
   let rectBuf = gpu.createUniform(16)
   gpu.writeBufferF32(rectBuf, 0, [x0, yTop, x1, yBottom])

@@ -14,7 +14,9 @@ fn findClip(clips, suffix) {
   while (i < clips.length) {
     let nm = clips[i].name
     if (nm !== null) {
-      if (nm.toLowerCase().indexOf(suffix) >= 0) { return i }
+      if (nm.toLowerCase().indexOf(suffix) >= 0) {
+        return i
+      }
     }
     i = i + 1
   }
@@ -27,11 +29,20 @@ export fn createController(host, animator, clips) {
   let vel = [0, 0, 0]
   let camTarget = [0, 1, 0]
   let camPos = [0, 3, 6]
-  let cam = { yaw: 0, pitch: 0.35, dist: 6.0 }
+  let cam = { yaw: 0, pitch: 0.35, dist: 6 }
   let state = {
-    facing: 0, grounded: true, anim: 0 - 1, moving: false,
-    hoodUp: true, hoodHeld: false, jumpHeld: false, actionTime: 0,
-    navActive: false, navX: 0, navZ: 0, camSnapped: false
+    facing: 0,
+    grounded: true,
+    anim: 0 - 1,
+    moving: false,
+    hoodUp: true,
+    hoodHeld: false,
+    jumpHeld: false,
+    actionTime: 0,
+    navActive: false,
+    navX: 0,
+    navZ: 0,
+    camSnapped: false
   }
 
   // Locomotion clips by name ("dash" is the run cycle; there's no run clip).
@@ -39,16 +50,30 @@ export fn createController(host, animator, clips) {
   let WALK = findClip(clips, "@walk")
   let DASH = findClip(clips, "@dash")
   let JUMP = findClip(clips, "@skill01")
-  if (IDLE < 0) { IDLE = 0 }
-  if (WALK < 0) { WALK = IDLE }
-  if (DASH < 0) { DASH = WALK }
-  if (JUMP < 0) { JUMP = IDLE }
+  if (IDLE < 0) {
+    IDLE = 0
+  }
+  if (WALK < 0) {
+    WALK = IDLE
+  }
+  if (DASH < 0) {
+    DASH = WALK
+  }
+  if (JUMP < 0) {
+    JUMP = IDLE
+  }
 
   // Action clips bound to Digit1..Digit9.
   let actionDefs = [
-    { code: "Digit1", anim: "@atk01" }, { code: "Digit2", anim: "@atk02" }, { code: "Digit3", anim: "@atk03" },
-    { code: "Digit4", anim: "@skill01-01" }, { code: "Digit5", anim: "@skill02" }, { code: "Digit6", anim: "@skill03-01" },
-    { code: "Digit7", anim: "@skill04-01" }, { code: "Digit8", anim: "@skill05-01" }, { code: "Digit9", anim: "@hit" }
+    { code: "Digit1", anim: "@atk01" },
+    { code: "Digit2", anim: "@atk02" },
+    { code: "Digit3", anim: "@atk03" },
+    { code: "Digit4", anim: "@skill01-01" },
+    { code: "Digit5", anim: "@skill02" },
+    { code: "Digit6", anim: "@skill03-01" },
+    { code: "Digit7", anim: "@skill04-01" },
+    { code: "Digit8", anim: "@skill05-01" },
+    { code: "Digit9", anim: "@hit" }
   ]
   let actions = []
   let held = []
@@ -56,21 +81,32 @@ export fn createController(host, animator, clips) {
   while (ai < actionDefs.length) {
     let idx = findClip(clips, actionDefs[ai].anim)
     let dur = 0
-    if (idx >= 0) { dur = clips[idx].duration }
+    if (idx >= 0) {
+      dur = clips[idx].duration
+    }
     actions.push({ code: actionDefs[ai].code, idx: idx, dur: dur })
     held.push(false)
     ai = ai + 1
   }
 
   fn keyDown(keys, code) {
-    if (js_get(keys, code) === true) { return 1 }
+    if (js_get(keys, code) === true) {
+      return 1
+    }
     return 0
   }
 
   let self = { pos: pos, vel: vel, cam: cam, state: state, camTarget: camTarget, camPos: camPos }
-  self.setMoveTarget = (x, z) => { state.navActive = true; state.navX = x; state.navZ = z }
+  self.setMoveTarget = (x, z) => {
+    state.navActive = true
+    state.navX = x
+    state.navZ = z
+  }
   self.setAnim = (idx) => {
-    if (state.anim !== idx) { state.anim = idx; animator.play(idx, true) }
+    if (state.anim !== idx) {
+      state.anim = idx
+      animator.play(idx, true)
+    }
   }
 
   self.update = (dt) => {
@@ -79,18 +115,30 @@ export fn createController(host, animator, clips) {
     cam.pitch = cam.pitch + js_get(input, "lookDy") * 0.005
     js_set(input, "lookDx", 0)
     js_set(input, "lookDy", 0)
-    if (cam.pitch < 0.05) { cam.pitch = 0.05 }
-    if (cam.pitch > 1.4) { cam.pitch = 1.4 }
+    if (cam.pitch < 0.05) {
+      cam.pitch = 0.05
+    }
+    if (cam.pitch > 1.4) {
+      cam.pitch = 1.4
+    }
     cam.dist = cam.dist + js_get(input, "wheel") * 0.01
     js_set(input, "wheel", 0)
-    if (cam.dist < 2.5) { cam.dist = 2.5 }
-    if (cam.dist > 16.0) { cam.dist = 16.0 }
+    if (cam.dist < 2.5) {
+      cam.dist = 2.5
+    }
+    if (cam.dist > 16) {
+      cam.dist = 16
+    }
 
     let keys = js_get(input, "keys")
 
     // Hood toggle (H, edge-triggered).
     let hd = keyDown(keys, "KeyH") > 0
-    if (hd) { if (!state.hoodHeld) { state.hoodUp = !state.hoodUp } }
+    if (hd) {
+      if (!state.hoodHeld) {
+        state.hoodUp = !state.hoodUp
+      }
+    }
     state.hoodHeld = hd
 
     // Action hotkeys (Digit1-9, edge-triggered one-shot, override locomotion).
@@ -119,8 +167,10 @@ export fn createController(host, animator, clips) {
     let moveX = fwd * (0 - sy) + strafe * cy
     let moveZ = fwd * (0 - cy) + strafe * (0 - sy)
     let len = Math.sqrt(moveX * moveX + moveZ * moveZ)
-    let speed = 4.0
-    if (keyDown(keys, "ShiftLeft") > 0) { speed = 13.0 }
+    let speed = 4
+    if (keyDown(keys, "ShiftLeft") > 0) {
+      speed = 13
+    }
 
     if (len > 0.01) {
       state.navActive = false
@@ -130,9 +180,13 @@ export fn createController(host, animator, clips) {
       vel[2] = moveZ * speed
       let targetFacing = Math.atan2(moveX, moveZ)
       let diff = targetFacing - state.facing
-      if (diff < (0 - 3.14159265)) { diff = diff + 6.28318531 }
-      if (diff > 3.14159265) { diff = diff - 6.28318531 }
-      state.facing = state.facing + diff * (1.0 - Math.exp(0 - 15.0 * dt))
+      if (diff < 0 - 3.14159265) {
+        diff = diff + 6.28318531
+      }
+      if (diff > 3.14159265) {
+        diff = diff - 6.28318531
+      }
+      state.facing = state.facing + diff * (1 - Math.exp(0 - 15 * dt))
       state.moving = true
     } else {
       if (state.navActive) {
@@ -140,40 +194,59 @@ export fn createController(host, animator, clips) {
         let dz = state.navZ - pos[2]
         let d = Math.sqrt(dx * dx + dz * dz)
         if (d > 0.5) {
-          let s = 4.0 / d
+          let s = 4 / d
           vel[0] = dx * s
           vel[2] = dz * s
           let targetFacing = Math.atan2(dx, dz)
           let diff = targetFacing - state.facing
-          if (diff < (0 - 3.14159265)) { diff = diff + 6.28318531 }
-          if (diff > 3.14159265) { diff = diff - 6.28318531 }
-          state.facing = state.facing + diff * (1.0 - Math.exp(0 - 15.0 * dt))
+          if (diff < 0 - 3.14159265) {
+            diff = diff + 6.28318531
+          }
+          if (diff > 3.14159265) {
+            diff = diff - 6.28318531
+          }
+          state.facing = state.facing + diff * (1 - Math.exp(0 - 15 * dt))
           state.moving = true
         } else {
           state.navActive = false
-          vel[0] = 0; vel[2] = 0; state.moving = false
+          vel[0] = 0
+          vel[2] = 0
+          state.moving = false
         }
       } else {
-        vel[0] = 0; vel[2] = 0; state.moving = false
+        vel[0] = 0
+        vel[2] = 0
+        state.moving = false
       }
     }
 
     // Gravity + jump.
-    vel[1] = vel[1] - 20.0 * dt
+    vel[1] = vel[1] - 20 * dt
     let jp = keyDown(keys, "Space") > 0
-    if (jp) { if (!state.jumpHeld) { if (state.grounded) { vel[1] = 9.0; state.grounded = false } } }
+    if (jp) {
+      if (!state.jumpHeld) {
+        if (state.grounded) {
+          vel[1] = 9
+          state.grounded = false
+        }
+      }
+    }
     state.jumpHeld = jp
 
     // Integrate + ground plane at y=0.
     pos[0] = pos[0] + vel[0] * dt
     pos[1] = pos[1] + vel[1] * dt
     pos[2] = pos[2] + vel[2] * dt
-    if (pos[1] <= 0) { pos[1] = 0; vel[1] = 0; state.grounded = true }
+    if (pos[1] <= 0) {
+      pos[1] = 0
+      vel[1] = 0
+      state.grounded = true
+    }
 
     // Smooth camera target (follow point).
-    let a = 1.0 - Math.exp(0 - 10.0 * dt)
+    let a = 1 - Math.exp(0 - 10 * dt)
     camTarget[0] = camTarget[0] + (pos[0] - camTarget[0]) * a
-    camTarget[1] = camTarget[1] + (pos[1] + 1.0 - camTarget[1]) * a
+    camTarget[1] = camTarget[1] + (pos[1] + 1 - camTarget[1]) * a
     camTarget[2] = camTarget[2] + (pos[2] - camTarget[2]) * a
 
     // Smooth orbit eye: yaw/pitch/dist update instantly from input, but the eye
@@ -191,7 +264,10 @@ export fn createController(host, animator, clips) {
       camPos[1] = camPos[1] + (dey - camPos[1]) * a
       camPos[2] = camPos[2] + (dez - camPos[2]) * a
     } else {
-      camPos[0] = dex; camPos[1] = dey; camPos[2] = dez; state.camSnapped = true
+      camPos[0] = dex
+      camPos[1] = dey
+      camPos[2] = dez
+      state.camSnapped = true
     }
 
     // Animation state: an active action plays out before locomotion resumes.
@@ -200,13 +276,20 @@ export fn createController(host, animator, clips) {
     } else {
       if (state.grounded) {
         if (state.moving) {
-          if (speed > 5.0) { self.setAnim(DASH) } else { self.setAnim(WALK) }
+          if (speed > 5) {
+            self.setAnim(DASH)
+          } else {
+            self.setAnim(WALK)
+          }
         } else {
           self.setAnim(IDLE)
         }
       } else {
         // Airborne: hold the jump pose (non-looping crossfade) until landing.
-        if (state.anim !== JUMP) { state.anim = JUMP; animator.play(JUMP, false) }
+        if (state.anim !== JUMP) {
+          state.anim = JUMP
+          animator.play(JUMP, false)
+        }
       }
     }
   }

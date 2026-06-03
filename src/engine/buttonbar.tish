@@ -8,10 +8,14 @@ export fn createButtonBar(gpu, host) {
     { code: "ShiftLeft", label: "Run", wide: true },
     { code: "Space", label: "Jump", wide: true },
     { code: "KeyH", label: "Hood", wide: true },
-    { code: "Digit1", label: "1", wide: false }, { code: "Digit2", label: "2", wide: false },
-    { code: "Digit3", label: "3", wide: false }, { code: "Digit4", label: "4", wide: false },
-    { code: "Digit5", label: "5", wide: false }, { code: "Digit6", label: "6", wide: false },
-    { code: "Digit7", label: "7", wide: false }, { code: "Digit8", label: "8", wide: false },
+    { code: "Digit1", label: "1", wide: false },
+    { code: "Digit2", label: "2", wide: false },
+    { code: "Digit3", label: "3", wide: false },
+    { code: "Digit4", label: "4", wide: false },
+    { code: "Digit5", label: "5", wide: false },
+    { code: "Digit6", label: "6", wide: false },
+    { code: "Digit7", label: "7", wide: false },
+    { code: "Digit8", label: "8", wide: false },
     { code: "Digit9", label: "9", wide: false }
   ]
 
@@ -32,28 +36,41 @@ export fn createButtonBar(gpu, host) {
       rects.push({ x: wideStart + i * 110, y: pad + hintH + (rowH - btnH) / 2, w: 100, h: btnH })
     } else {
       let j = i - 3
-      rects.push({ x: smallStart + j * 50, y: pad + hintH + rowH + (rowH - btnH) / 2, w: 44, h: btnH })
+      rects.push({
+        x: smallStart + j * 50,
+        y: pad + hintH + rowH + (rowH - btnH) / 2,
+        w: 44,
+        h: btnH
+      })
     }
     i = i + 1
   }
 
   let oc = js_new("OffscreenCanvas", [W, H])
   let ctx = js_call(oc, "getContext", ["2d"])
-  let tex = gpu.createTexture(W, H, "rgba8unorm", gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER)
+  let tex = gpu.createTexture(
+    W,
+    H,
+    "rgba8unorm",
+    gpu.TEXTURE.BINDING | gpu.TEXTURE.COPY_DST | gpu.TEXTURE.RENDER
+  )
   let sampler = gpu.createSampler({ magFilter: "linear", minFilter: "linear" })
   let mod = gpu.shaderModule(js_get(js_get(host, "shaders"), "hud"))
   let pipeline = gpu.renderPipeline({
     layout: "auto",
     vertex: { module: mod, entryPoint: "vs_main" },
     fragment: {
-      module: mod, entryPoint: "fs_main",
-      targets: [{
-        format: gpu.format,
-        blend: {
-          color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-          alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+      module: mod,
+      entryPoint: "fs_main",
+      targets: [
+        {
+          format: gpu.format,
+          blend: {
+            color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
+            alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }
+          }
         }
-      }]
+      ]
     },
     primitive: { topology: "triangle-strip" }
   })
@@ -62,17 +79,24 @@ export fn createButtonBar(gpu, host) {
   let canvas = js_get(host, "canvas")
   let cw = js_get(canvas, "width")
   let chh = js_get(canvas, "height")
-  let margin = 18.0
-  let drawW = W * 1.0
-  if (drawW > (cw - margin * 2)) { drawW = cw - margin * 2 }
+  let margin = 18
+  let drawW = W * 1
+  if (drawW > cw - margin * 2) {
+    drawW = cw - margin * 2
+  }
   let scale = drawW / W
   let drawH = H * scale
   let x0 = (cw - drawW) / 2
-  let y1 = chh - margin - (chh * 0.15)
+  let y1 = chh - margin - chh * 0.15
   let y0 = y1 - drawH
 
   let rectBuf = gpu.createUniform(16)
-  gpu.writeBufferF32(rectBuf, 0, [(x0 / cw) * 2 - 1, 1 - (y0 / chh) * 2, ((x0 + drawW) / cw) * 2 - 1, 1 - (y1 / chh) * 2])
+  gpu.writeBufferF32(rectBuf, 0, [
+    x0 / cw * 2 - 1,
+    1 - y0 / chh * 2,
+    (x0 + drawW) / cw * 2 - 1,
+    1 - y1 / chh * 2
+  ])
   let bindGroup = gpu.createBindGroup(gpu.bindGroupLayout(pipeline, 0), [
     { binding: 0, resource: { buffer: rectBuf } },
     { binding: 1, resource: sampler },
@@ -83,14 +107,16 @@ export fn createButtonBar(gpu, host) {
   let ri = 0
   while (ri < rects.length) {
     let r = rects[ri]
-    let bx0 = x0 + (r.x / W) * drawW
-    let bx1 = x0 + ((r.x + r.w) / W) * drawW
-    let byTop = y0 + (r.y / H) * drawH
-    let byBot = y0 + ((r.y + r.h) / H) * drawH
+    let bx0 = x0 + r.x / W * drawW
+    let bx1 = x0 + (r.x + r.w) / W * drawW
+    let byTop = y0 + r.y / H * drawH
+    let byBot = y0 + (r.y + r.h) / H * drawH
     jsButtons.push({
       code: defs[ri].code,
-      x0: (bx0 / cw) * 2 - 1, x1: (bx1 / cw) * 2 - 1,
-      yTop: 1 - (byTop / chh) * 2, yBot: 1 - (byBot / chh) * 2
+      x0: bx0 / cw * 2 - 1,
+      x1: bx1 / cw * 2 - 1,
+      yTop: 1 - byTop / chh * 2,
+      yBot: 1 - byBot / chh * 2
     })
     ri = ri + 1
   }
@@ -108,16 +134,24 @@ export fn createButtonBar(gpu, host) {
     js_set(ctx, "font", "15px ui-monospace, monospace")
     js_set(ctx, "fillStyle", "#8fe6ff")
     js_call(ctx, "fillText", ["Shift: run   Drag: look   Wheel: zoom   Click: move", 14, 26])
-    
+
     js_set(ctx, "textBaseline", "middle")
     js_set(ctx, "textAlign", "center")
     let bi = 0
     while (bi < rects.length) {
       let r = rects[bi]
       let on = active[bi]
-      if (on) { js_set(ctx, "fillStyle", "rgba(90,200,255,0.85)") } else { js_set(ctx, "fillStyle", "rgba(60,70,100,0.55)") }
+      if (on) {
+        js_set(ctx, "fillStyle", "rgba(90,200,255,0.85)")
+      } else {
+        js_set(ctx, "fillStyle", "rgba(60,70,100,0.55)")
+      }
       js_call(ctx, "fillRect", [r.x, r.y, r.w, r.h])
-      if (on) { js_set(ctx, "fillStyle", "rgba(8,14,26,0.95)") } else { js_set(ctx, "fillStyle", "rgba(225,235,255,0.92)") }
+      if (on) {
+        js_set(ctx, "fillStyle", "rgba(8,14,26,0.95)")
+      } else {
+        js_set(ctx, "fillStyle", "rgba(225,235,255,0.92)")
+      }
       js_set(ctx, "font", "600 12px ui-monospace, monospace")
       js_call(ctx, "fillText", [defs[bi].label, r.x + r.w / 2, r.y + r.h / 2 + 1])
       bi = bi + 1
@@ -132,7 +166,10 @@ export fn createButtonBar(gpu, host) {
 
   let initActive = []
   let q = 0
-  while (q < defs.length) { initActive.push(false); q = q + 1 }
+  while (q < defs.length) {
+    initActive.push(false)
+    q = q + 1
+  }
   self.bake(initActive)
   return self
 }
